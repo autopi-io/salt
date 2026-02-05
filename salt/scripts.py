@@ -615,6 +615,10 @@ def salt_pip():
     """
     Proxy to current python's pip
     """
+    import salt.config
+    import salt.utils.user
+    import salt.utils.verify
+
     relenv_path = _get_onedir_env_path()
     if relenv_path is None:
         print(
@@ -626,6 +630,15 @@ def salt_pip():
         sys.exit(salt.defaults.exitcodes.EX_GENERIC)
     else:
         extras = str(relenv_path / "extras-{}.{}".format(*sys.version_info))
+
+    # We want to use minion config to determine user
+    # We pass DEFAULT_MINION_OPTS["conf_file"] to allow minion_config to verify env vars
+    opts = salt.config.minion_config(salt.config.DEFAULT_MINION_OPTS["conf_file"])
+
+    user = opts.get("user")
+    if user and user != salt.utils.user.get_user():
+        salt.utils.verify.check_user(user)
+
     env = _pip_environment(os.environ.copy(), extras)
     args = _pip_args(sys.argv[1:], extras)
     command = [
