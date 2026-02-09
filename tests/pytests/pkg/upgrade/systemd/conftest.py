@@ -384,15 +384,17 @@ def salt_systemd_setup(
     yield
 
     # Verify that the new version is installed after the test
-    ret = call_cli.run("--local", "test.version")
+    # Use --priv=root in case test modified user config
+    ret = call_cli.run("--local", "--priv=root", "test.version")
     assert ret.returncode == 0
     installed_minion_version = packaging.version.parse(ret.data)
     assert installed_minion_version == upgrade_version
 
     # Reset systemd services to their preset states
+    # Use --priv=root for administrative tasks
     for test_item in test_list:
         test_cmd = f"systemctl preset {test_item}"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
         assert ret.returncode == 0
 
     # Install previous version, downgrading if necessary
@@ -424,13 +426,14 @@ def salt_systemd_mask_services(call_cli):
     test_list = ["salt-api", "salt-minion", "salt-master"]
     for test_item in test_list:
         test_cmd = f"systemctl mask {test_item}"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
         assert ret.returncode == 0
 
     yield
 
     # Cleanup: unmask the services after the test
+    # Use --priv=root for administrative tasks
     for test_item in test_list:
         test_cmd = f"systemctl unmask {test_item}"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
         assert ret.returncode == 0
