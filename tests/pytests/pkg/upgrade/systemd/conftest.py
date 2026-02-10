@@ -383,18 +383,31 @@ def salt_systemd_setup(
     # Run tests
     yield
 
+    # Check if the current salt-call version supports --priv option
+    # The --priv option was added to maintain root privileges for administrative tasks,
+    # but older salt versions don't support this option.
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
     # Verify that the new version is installed after the test
-    # Use --priv=root in case test modified user config
-    ret = call_cli.run("--local", "--priv=root", "test.version")
+    # Use --priv=root if supported to handle case where test modified user config
+    if supports_priv:
+        ret = call_cli.run("--local", "--priv=root", "test.version")
+    else:
+        ret = call_cli.run("--local", "test.version")
     assert ret.returncode == 0
     installed_minion_version = packaging.version.parse(ret.data)
     assert installed_minion_version == upgrade_version
 
     # Reset systemd services to their preset states
-    # Use --priv=root for administrative tasks
+    # Use --priv=root for administrative tasks if the version supports it.
+    # This maintains root privileges even if a test modified the user config.
     for test_item in test_list:
         test_cmd = f"systemctl preset {test_item}"
-        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
         assert ret.returncode == 0
 
     # Install previous version, downgrading if necessary
@@ -423,17 +436,33 @@ def salt_systemd_mask_services(call_cli):
     This is required to test the preservation of masked state during upgrades.
     """
 
+    # Check if the current salt-call version supports --priv option
+    # The --priv option was added to prevent privilege dropping in certain scenarios,
+    # but older salt versions don't support it.
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
     test_list = ["salt-api", "salt-minion", "salt-master"]
     for test_item in test_list:
         test_cmd = f"systemctl mask {test_item}"
-        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        # Use --priv=root to maintain root privileges for administrative systemctl operations
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
         assert ret.returncode == 0
 
     yield
 
     # Cleanup: unmask the services after the test
-    # Use --priv=root for administrative tasks
+    # Check again in case upgrade happened during the test
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
     for test_item in test_list:
         test_cmd = f"systemctl unmask {test_item}"
-        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
         assert ret.returncode == 0

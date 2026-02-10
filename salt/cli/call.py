@@ -41,6 +41,11 @@ class SaltCall(salt.utils.parsers.SaltCallOptionParser):
         if self.options.user:
             self.config["user"] = self.options.user
 
+        # Drop privileges BEFORE verify_env to ensure directories are created with correct ownership
+        if self.config["user"] != salt.utils.user.get_user():
+            if not salt.utils.verify.check_user(self.config["user"]):
+                self.exit(salt.defaults.exitcodes.EX_NOUSER)
+
         if self.config["verify_env"]:
             salt.utils.verify.verify_env(
                 [
@@ -52,10 +57,6 @@ class SaltCall(salt.utils.parsers.SaltCallOptionParser):
                 permissive=self.config["permissive_pki_access"],
                 pki_dir=self.config["pki_dir"],
             )
-
-        if self.config["user"] != salt.utils.user.get_user():
-            if not salt.utils.verify.check_user(self.config["user"]):
-                self.exit(salt.defaults.exitcodes.EX_NOUSER)
 
         caller = salt.cli.caller.Caller.factory(self.config)
 

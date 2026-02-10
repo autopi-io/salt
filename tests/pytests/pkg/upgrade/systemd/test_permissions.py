@@ -67,12 +67,20 @@ def test_salt_ownership_permission(call_cli, install_salt_systemd, salt_systemd_
     test_string = f"\nuser: {test_minion_user}\n"
     ret = call_cli.run("--local", "file.append", "/etc/salt/minion", test_string)
 
+    # Check if the current salt-call version supports --priv option
+    # We do this before the upgrade since we're still on the old version
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
     # restart and check ownership is correct
-    # Use --priv=root for administrative tasks after setting user config
+    # Use --priv=root if supported, otherwise run without it
     test_list = ["salt-api", "salt-minion", "salt-master"]
     for test_item in test_list:
         test_cmd = f"systemctl restart {test_item}"
-        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
 
     time.sleep(10)  # allow some time for restart
 
@@ -80,7 +88,10 @@ def test_salt_ownership_permission(call_cli, install_salt_systemd, salt_systemd_
     test_list = ["salt-api", "salt-minion", "salt-master"]
     for test_item in test_list:
         test_cmd = f"ls -dl /run/{test_item}.pid"
-        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
         assert ret.returncode == 0
 
         test_user = ret.stdout.strip().split()[4]
