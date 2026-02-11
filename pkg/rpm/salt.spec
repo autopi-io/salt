@@ -454,41 +454,17 @@ usermod -c "%{_SALT_NAME}" \
          %{_SALT_USER}
 
 %pre master
-if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    _MS_LCUR_USER=$(ls -dl /run/salt/master | cut -d ' ' -f 3)
-    _MS_LCUR_GROUP=$(ls -dl /run/salt/master | cut -d ' ' -f 4)
-    %global _MS_CUR_USER  %{_MS_LCUR_USER}
-    %global _MS_CUR_GROUP %{_MS_LCUR_GROUP}
-fi
+# No pre-upgrade actions needed for master
 
 %pre syndic
-if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    _MS_LCUR_USER=$(ls -dl /run/salt/master | cut -d ' ' -f 3)
-    _MS_LCUR_GROUP=$(ls -dl /run/salt/master | cut -d ' ' -f 4)
-    %global _MS_CUR_USER  %{_MS_LCUR_USER}
-    %global _MS_CUR_GROUP %{_MS_LCUR_GROUP}
-fi
+# No pre-upgrade actions needed for syndic
 
 %pre minion
-if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    _MN_LCUR_USER=$(ls -dl /run/salt/minion | cut -d ' ' -f 3)
-    _MN_LCUR_GROUP=$(ls -dl /run/salt/minion | cut -d ' ' -f 4)
-    %global _MN_CUR_USER  %{_MN_LCUR_USER}
-    %global _MN_CUR_GROUP %{_MN_LCUR_GROUP}
-fi
+# No pre-upgrade actions needed for minion
 
 
 %pre cloud
-if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    _MS_LCUR_USER=$(ls -dl /etc/salt/cloud.deploy.d | cut -d ' ' -f 3)
-    _MS_LCUR_GROUP=$(ls -dl /etc/salt/cloud.deploy.d | cut -d ' ' -f 4)
-    %global _MS_CUR_USER  %{_MS_LCUR_USER}
-    %global _MS_CUR_GROUP %{_MS_LCUR_GROUP}
-fi
+# No pre-upgrade actions needed for cloud
 
 # assumes systemd for RHEL 7 & 8 & 9
 # foregoing %systemd_* scriptlets due to RHEL 7/8 vs. RHEL 9 incompatibilities
@@ -625,7 +601,15 @@ if [ ! -e "/var/log/salt/cloud" ]; then
 fi
 if [ $1 -gt 1 ] ; then
     # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MS_CUR_USER}:%{_MS_CUR_GROUP} /etc/salt/cloud.deploy.d /var/log/salt/cloud /opt/saltstack/salt/lib/python${PY_VER}/site-packages/salt/cloud/deploy
+    # Detect the current user/group from existing directories
+    if [ -d "/etc/salt/cloud.deploy.d" ]; then
+        _MS_LCUR_USER=$(stat -c '%U' /etc/salt/cloud.deploy.d 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_LCUR_GROUP=$(stat -c '%G' /etc/salt/cloud.deploy.d 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _MS_LCUR_USER="%{_SALT_USER}"
+        _MS_LCUR_GROUP="%{_SALT_GROUP}"
+    fi
+    chown -R ${_MS_LCUR_USER}:${_MS_LCUR_GROUP} /etc/salt/cloud.deploy.d /var/log/salt/cloud /opt/saltstack/salt/lib/python${PY_VER}/site-packages/salt/cloud/deploy 2>/dev/null || true
 else
     chown -R %{_SALT_USER}:%{_SALT_GROUP} /etc/salt/cloud.deploy.d /var/log/salt/cloud /opt/saltstack/salt/lib/python${PY_VER}/site-packages/salt/cloud/deploy
 fi
@@ -642,7 +626,18 @@ if [ ! -e "/var/log/salt/key" ]; then
 fi
 if [ $1 -gt 1 ] ; then
     # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MS_CUR_USER}:%{_MS_CUR_GROUP} /etc/salt/pki/master /etc/salt/master.d /var/log/salt/master /var/log/salt/key /var/cache/salt/master /var/run/salt/master
+    # Detect the current user/group from existing directories
+    if [ -d "/var/run/salt/master" ]; then
+        _MS_LCUR_USER=$(stat -c '%U' /var/run/salt/master 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_LCUR_GROUP=$(stat -c '%G' /var/run/salt/master 2>/dev/null || echo "%{_SALT_GROUP}")
+    elif [ -d "/var/cache/salt/master" ]; then
+        _MS_LCUR_USER=$(stat -c '%U' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_LCUR_GROUP=$(stat -c '%G' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _MS_LCUR_USER="%{_SALT_USER}"
+        _MS_LCUR_GROUP="%{_SALT_GROUP}"
+    fi
+    chown -R ${_MS_LCUR_USER}:${_MS_LCUR_GROUP} /etc/salt/pki/master /etc/salt/master.d /var/log/salt/master /var/log/salt/key /var/cache/salt/master /var/run/salt/master 2>/dev/null || true
 else
     chown -R %{_SALT_USER}:%{_SALT_GROUP} /etc/salt/pki/master /etc/salt/master.d /var/log/salt/master /var/log/salt/key /var/cache/salt/master /var/run/salt/master
 fi
@@ -655,7 +650,15 @@ if [ ! -e "/var/log/salt/syndic" ]; then
 fi
 if [ $1 -gt 1 ] ; then
     # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MS_CUR_USER}:%{_MS_CUR_GROUP} /var/log/salt/syndic
+    # Detect the current user/group from existing directories
+    if [ -f "/var/log/salt/syndic" ]; then
+        _MS_LCUR_USER=$(stat -c '%U' /var/log/salt/syndic 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_LCUR_GROUP=$(stat -c '%G' /var/log/salt/syndic 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _MS_LCUR_USER="%{_SALT_USER}"
+        _MS_LCUR_GROUP="%{_SALT_GROUP}"
+    fi
+    chown -R ${_MS_LCUR_USER}:${_MS_LCUR_GROUP} /var/log/salt/syndic 2>/dev/null || true
 else
     chown -R %{_SALT_USER}:%{_SALT_GROUP} /var/log/salt/syndic
 fi
@@ -668,7 +671,15 @@ if [ ! -e "/var/log/salt/api" ]; then
 fi
 if [ $1 -gt 1 ] ; then
     # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MS_CUR_USER}:%{_MS_CUR_GROUP} /var/log/salt/api
+    # Detect the current user/group from existing directories
+    if [ -f "/var/log/salt/api" ]; then
+        _MS_LCUR_USER=$(stat -c '%U' /var/log/salt/api 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_LCUR_GROUP=$(stat -c '%G' /var/log/salt/api 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _MS_LCUR_USER="%{_SALT_USER}"
+        _MS_LCUR_GROUP="%{_SALT_GROUP}"
+    fi
+    chown -R ${_MS_LCUR_USER}:${_MS_LCUR_GROUP} /var/log/salt/api 2>/dev/null || true
 else
     chown -R %{_SALT_USER}:%{_SALT_GROUP} /var/log/salt/api
 fi
@@ -684,7 +695,18 @@ if [ ! -e "/var/log/salt/key" ]; then
 fi
 if [ $1 -gt 1 ] ; then
     # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MN_CUR_USER}:%{_MN_CUR_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion
+    # Detect the current user/group from existing directories
+    if [ -d "/var/run/salt/minion" ]; then
+        _MN_LCUR_USER=$(stat -c '%U' /var/run/salt/minion 2>/dev/null || echo "%{_SALT_USER}")
+        _MN_LCUR_GROUP=$(stat -c '%G' /var/run/salt/minion 2>/dev/null || echo "%{_SALT_GROUP}")
+    elif [ -d "/var/cache/salt/minion" ]; then
+        _MN_LCUR_USER=$(stat -c '%U' /var/cache/salt/minion 2>/dev/null || echo "%{_SALT_USER}")
+        _MN_LCUR_GROUP=$(stat -c '%G' /var/cache/salt/minion 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _MN_LCUR_USER="%{_SALT_USER}"
+        _MN_LCUR_GROUP="%{_SALT_GROUP}"
+    fi
+    chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion 2>/dev/null || true
 fi
 
 
