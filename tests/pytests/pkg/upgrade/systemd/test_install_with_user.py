@@ -65,8 +65,8 @@ def test_salt_user_ownership_preserved_on_upgrade(
     log.info("Testing upgrade from %s to %s", installed_version, upgrade_version)
 
     # The previous version doesn't support SALT_MINION_USER environment variable,
-    # so we need to manually set up salt:salt ownership to simulate a system
-    # that was installed with salt user configuration.
+    # so we need to manually set up salt:salt ownership AND user configuration
+    # to simulate a system that was installed with salt user configuration.
 
     # First, ensure salt user exists
     ret = call_cli.run("--local", "user.info", "salt")
@@ -74,6 +74,23 @@ def test_salt_user_ownership_preserved_on_upgrade(
         log.info("Creating salt user for testing")
         ret = call_cli.run("--local", "user.add", "salt", system=True, createhome=False)
         assert ret.returncode == 0
+
+    # Configure minion to run as salt user
+    log.info("Configuring minion to run as salt user")
+    ret = call_cli.run(
+        "--local",
+        "cmd.run",
+        "mkdir -p /etc/salt/minion.d && echo 'user: salt' > /etc/salt/minion.d/user.conf",
+    )
+    assert ret.returncode == 0
+
+    # Restart minion to apply the user configuration
+    log.info("Restarting minion to apply user configuration")
+    ret = call_cli.run(
+        "--local", "--priv=root", "cmd.run", "systemctl restart salt-minion"
+    )
+    assert ret.returncode == 0
+    time.sleep(5)  # Wait for minion to restart
 
     # Define the minion directories
     minion_dirs = [
@@ -83,11 +100,13 @@ def test_salt_user_ownership_preserved_on_upgrade(
         "/var/run/salt/minion",
     ]
 
-    # Manually change ownership to salt:salt to simulate a system configured
-    # to run as salt user
-    log.info("Setting up salt:salt ownership on minion directories")
+    # After restarting with user: salt, the minion should have created directories
+    # as salt:salt. But if they were previously root:root, manually change them.
+    log.info("Ensuring salt:salt ownership on minion directories")
     for dir_path in minion_dirs:
-        ret = call_cli.run("--local", "cmd.run", f"chown -R salt:salt {dir_path}")
+        ret = call_cli.run(
+            "--local", "--priv=root", "cmd.run", f"chown -R salt:salt {dir_path}"
+        )
         if ret.returncode != 0:
             log.warning("Failed to chown %s, directory may not exist yet", dir_path)
 

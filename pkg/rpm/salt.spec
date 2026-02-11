@@ -488,19 +488,44 @@ fi
 # Save current ownership before upgrade to preserve it
 if [ $1 -gt 1 ] ; then
     # Upgrade: detect and save current ownership BEFORE rpm overwrites files
-    # Check persistent directories to get the current configured ownership
-    if [ -d "/var/cache/salt/minion" ]; then
-        _MN_PRE_USER=$(stat -c '%U' /var/cache/salt/minion 2>/dev/null || echo "root")
-        _MN_PRE_GROUP=$(stat -c '%G' /var/cache/salt/minion 2>/dev/null || echo "root")
-    elif [ -d "/etc/salt/pki/minion" ]; then
-        _MN_PRE_USER=$(stat -c '%U' /etc/salt/pki/minion 2>/dev/null || echo "root")
-        _MN_PRE_GROUP=$(stat -c '%G' /etc/salt/pki/minion 2>/dev/null || echo "root")
-    else
-        _MN_PRE_USER="root"
-        _MN_PRE_GROUP="root"
+    # Try to detect the user from the config first, then fall back to directory ownership
+    _MN_PRE_USER=""
+    _MN_PRE_GROUP=""
+
+    # Check if user is configured in config files
+    if [ -f "/etc/salt/minion" ] && grep -q "^user:" /etc/salt/minion 2>/dev/null; then
+        _MN_PRE_USER=$(grep "^user:" /etc/salt/minion | awk '{print $2}' | head -1)
+    elif [ -d "/etc/salt/minion.d" ]; then
+        # Check for user config in minion.d/*.conf files
+        for conf in /etc/salt/minion.d/*.conf; do
+            if [ -f "$conf" ] && grep -q "^user:" "$conf" 2>/dev/null; then
+                _MN_PRE_USER=$(grep "^user:" "$conf" | awk '{print $2}' | head -1)
+                break
+            fi
+        done
     fi
-    # Save to temp file for posttrans to use
-    echo "${_MN_PRE_USER}:${_MN_PRE_GROUP}" > /tmp/.salt-minion-upgrade-ownership
+
+    # If user found in config, get their primary group
+    if [ -n "$_MN_PRE_USER" ] && [ "$_MN_PRE_USER" != "root" ]; then
+        _MN_PRE_GROUP=$(id -gn "$_MN_PRE_USER" 2>/dev/null || echo "")
+    fi
+
+    # If we still don't have a user, check directory ownership
+    if [ -z "$_MN_PRE_USER" ]; then
+        # Check persistent directories to get the current configured ownership
+        if [ -d "/var/cache/salt/minion" ]; then
+            _MN_PRE_USER=$(stat -c '%U' /var/cache/salt/minion 2>/dev/null || echo "")
+            _MN_PRE_GROUP=$(stat -c '%G' /var/cache/salt/minion 2>/dev/null || echo "")
+        elif [ -d "/etc/salt/pki/minion" ]; then
+            _MN_PRE_USER=$(stat -c '%U' /etc/salt/pki/minion 2>/dev/null || echo "")
+            _MN_PRE_GROUP=$(stat -c '%G' /etc/salt/pki/minion 2>/dev/null || echo "")
+        fi
+    fi
+
+    # Only save if we found a non-root user, otherwise let posttrans use root default
+    if [ -n "$_MN_PRE_USER" ] && [ "$_MN_PRE_USER" != "root" ] && [ -n "$_MN_PRE_GROUP" ]; then
+        echo "${_MN_PRE_USER}:${_MN_PRE_GROUP}" > /tmp/.salt-minion-upgrade-ownership
+    fi
 fi
 
 
@@ -698,8 +723,41 @@ if [ $1 -gt 1 ] ; then
         _MS_LCUR_GROUP="%{_SALT_GROUP}"
     fi
     chown -R ${_MS_LCUR_USER}:${_MS_LCUR_GROUP} /etc/salt/pki/master /etc/salt/master.d /var/log/salt/master /var/log/salt/key /var/cache/salt/master /var/run/salt/master 2>/dev/null || true
+
+    # If upgrading and ownership was non-root, ensure user config is set
+    if [ "$_MS_LCUR_USER" != "root" ] && [ -n "$_MS_LCUR_USER" ]; then
+        # Check if user is already configured
+        _MS_USER_CONFIGURED=0
+        if grep -q "^user:" /etc/salt/master 2>/dev/null; then
+            _MS_USER_CONFIGURED=1
+        elif [ -d /etc/salt/master.d ] && grep -q "^user:" /etc/salt/master.d/*.conf 2>/dev/null; then
+            _MS_USER_CONFIGURED=1
+        fi
+
+        # Only set if not already configured
+        if [ $_MS_USER_CONFIGURED -eq 0 ]; then
+            mkdir -p /etc/salt/master.d
+            echo "user: ${_MS_LCUR_USER}" > /etc/salt/master.d/user.conf
+            chmod 644 /etc/salt/master.d/user.conf
+        fi
+    fi
 else
     chown -R %{_SALT_USER}:%{_SALT_GROUP} /etc/salt/pki/master /etc/salt/master.d /var/log/salt/master /var/log/salt/key /var/cache/salt/master /var/run/salt/master
+
+    # If %{_SALT_USER} is not root, configure master to run as that user
+    # Check if user is already configured
+    _MS_USER_CONFIGURED=0
+    if grep -q "^user:" /etc/salt/master 2>/dev/null; then
+        _MS_USER_CONFIGURED=1
+    elif [ -d /etc/salt/master.d ] && grep -q "^user:" /etc/salt/master.d/*.conf 2>/dev/null; then
+        _MS_USER_CONFIGURED=1
+    fi
+
+    if [ "%{_SALT_USER}" != "root" ] && [ $_MS_USER_CONFIGURED -eq 0 ]; then
+        mkdir -p /etc/salt/master.d
+        echo "user: %{_SALT_USER}" > /etc/salt/master.d/user.conf
+        chmod 644 /etc/salt/master.d/user.conf
+    fi
 fi
 
 
@@ -768,11 +826,36 @@ if [ $1 -gt 1 ] ; then
         _MN_LCUR_GROUP="root"
     fi
     chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion 2>/dev/null || true
+
+    # If upgrading and ownership was non-root, ensure user config is set
+    if [ "$_MN_LCUR_USER" != "root" ] && [ -n "$_MN_LCUR_USER" ]; then
+        # Check if user is already configured
+        _MN_USER_CONFIGURED=0
+        if grep -q "^user:" /etc/salt/minion 2>/dev/null; then
+            _MN_USER_CONFIGURED=1
+        elif [ -d /etc/salt/minion.d ] && grep -q "^user:" /etc/salt/minion.d/*.conf 2>/dev/null; then
+            _MN_USER_CONFIGURED=1
+        fi
+
+        # Only set if not already configured
+        if [ $_MN_USER_CONFIGURED -eq 0 ]; then
+            mkdir -p /etc/salt/minion.d
+            echo "user: ${_MN_LCUR_USER}" > /etc/salt/minion.d/user.conf
+            chmod 644 /etc/salt/minion.d/user.conf
+        fi
+    fi
 else
     # Fresh install: check for environment variables to configure ownership
     _MN_INSTALL_USER="${SALT_MINION_USER:-root}"
     _MN_INSTALL_GROUP="${SALT_MINION_GROUP:-root}"
     chown -R ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion 2>/dev/null || true
+
+    # If SALT_MINION_USER is set and not root, configure minion to run as that user
+    if [ -n "$SALT_MINION_USER" ] && [ "$SALT_MINION_USER" != "root" ]; then
+        mkdir -p /etc/salt/minion.d
+        echo "user: ${SALT_MINION_USER}" > /etc/salt/minion.d/user.conf
+        chmod 644 /etc/salt/minion.d/user.conf
+    fi
 fi
 
 
