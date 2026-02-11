@@ -24,7 +24,27 @@ log = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def install_salt_systemd(request, salt_factories_root_dir):
+def salt_install_env(request):
+    """
+    Fixture to provide custom environment variables for package installation.
+
+    Tests can override this fixture to provide custom environment variables
+    that will be passed to the package manager during installation.
+
+    Example:
+        @pytest.fixture
+        def salt_install_env():
+            return {"SALT_MINION_USER": "salt", "SALT_MINION_GROUP": "salt"}
+    """
+    # Check if the test has a custom salt_install_env marker
+    marker = request.node.get_closest_marker("salt_install_env")
+    if marker:
+        return marker.kwargs
+    return {}
+
+
+@pytest.fixture
+def install_salt_systemd(request, salt_factories_root_dir, salt_install_env):
     if platform.is_windows():
         conf_dir = "c:/salt/etc/salt"
     else:
@@ -38,6 +58,7 @@ def install_salt_systemd(request, salt_factories_root_dir):
         no_install=request.config.getoption("--no-install"),
         prev_version=request.config.getoption("--prev-version"),
         use_prev_version=request.config.getoption("--use-prev-version"),
+        install_env=salt_install_env,
     ) as fixture:
         # XXX Force un-install for now
         fixture.no_uninstall = False
