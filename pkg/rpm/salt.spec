@@ -558,6 +558,13 @@ ln -s -f /opt/saltstack/salt/salt-call %{_bindir}/salt-call
 ln -s -f /opt/saltstack/salt/salt-proxy %{_bindir}/salt-proxy
 if [ $1 -lt 2 ]; then
   # install
+  # Check for environment variables to configure minion user/group
+  if [ -n "$SALT_MINION_USER" ]; then
+    # Add user to additional groups if specified
+    if [ -n "$SALT_MINION_GROUPS" ]; then
+      usermod -a -G "$SALT_MINION_GROUPS" "$SALT_MINION_USER" 2>/dev/null || :
+    fi
+  fi
   # ensure hmac are up to date, master or minion, rest install one or the other
   # key used is from openssl/crypto/fips/fips_standalone_hmac.c openssl 1.1.1k
   if [ $(cat /etc/os-release | grep VERSION_ID | cut -d '=' -f 2 | sed  's/\"//g' | cut -d '.' -f 1) = "8" ]; then
@@ -707,6 +714,11 @@ if [ $1 -gt 1 ] ; then
         _MN_LCUR_GROUP="%{_SALT_GROUP}"
     fi
     chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion 2>/dev/null || true
+else
+    # Fresh install: check for environment variables to configure ownership
+    _MN_INSTALL_USER="${SALT_MINION_USER:-root}"
+    _MN_INSTALL_GROUP="${SALT_MINION_GROUP:-root}"
+    chown -R ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion 2>/dev/null || true
 fi
 
 
