@@ -634,13 +634,18 @@ fi
 if [ $1 -gt 1 ] ; then
     # Reset permissions to match previous installs - performing upgrade
     # Detect the current user/group from existing directories
-    if [ -d "/var/run/salt/master" ]; then
-        _MS_LCUR_USER=$(stat -c '%U' /var/run/salt/master 2>/dev/null || echo "%{_SALT_USER}")
-        _MS_LCUR_GROUP=$(stat -c '%G' /var/run/salt/master 2>/dev/null || echo "%{_SALT_GROUP}")
-    elif [ -d "/var/cache/salt/master" ]; then
+    # Check persistent directories first (not /var/run which may be tmpfs)
+    if [ -d "/var/cache/salt/master" ]; then
         _MS_LCUR_USER=$(stat -c '%U' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_USER}")
         _MS_LCUR_GROUP=$(stat -c '%G' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_GROUP}")
+    elif [ -d "/etc/salt/pki/master" ]; then
+        _MS_LCUR_USER=$(stat -c '%U' /etc/salt/pki/master 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_LCUR_GROUP=$(stat -c '%G' /etc/salt/pki/master 2>/dev/null || echo "%{_SALT_GROUP}")
+    elif [ -d "/var/run/salt/master" ]; then
+        _MS_LCUR_USER=$(stat -c '%U' /var/run/salt/master 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_LCUR_GROUP=$(stat -c '%G' /var/run/salt/master 2>/dev/null || echo "%{_SALT_GROUP}")
     else
+        # Default to salt:salt for master (matches default runtime user)
         _MS_LCUR_USER="%{_SALT_USER}"
         _MS_LCUR_GROUP="%{_SALT_GROUP}"
     fi
@@ -703,15 +708,20 @@ fi
 if [ $1 -gt 1 ] ; then
     # Reset permissions to match previous installs - performing upgrade
     # Detect the current user/group from existing directories
-    if [ -d "/var/run/salt/minion" ]; then
-        _MN_LCUR_USER=$(stat -c '%U' /var/run/salt/minion 2>/dev/null || echo "%{_SALT_USER}")
-        _MN_LCUR_GROUP=$(stat -c '%G' /var/run/salt/minion 2>/dev/null || echo "%{_SALT_GROUP}")
-    elif [ -d "/var/cache/salt/minion" ]; then
-        _MN_LCUR_USER=$(stat -c '%U' /var/cache/salt/minion 2>/dev/null || echo "%{_SALT_USER}")
-        _MN_LCUR_GROUP=$(stat -c '%G' /var/cache/salt/minion 2>/dev/null || echo "%{_SALT_GROUP}")
+    # Check persistent directories first (not /var/run which may be tmpfs)
+    if [ -d "/var/cache/salt/minion" ]; then
+        _MN_LCUR_USER=$(stat -c '%U' /var/cache/salt/minion 2>/dev/null || echo "root")
+        _MN_LCUR_GROUP=$(stat -c '%G' /var/cache/salt/minion 2>/dev/null || echo "root")
+    elif [ -d "/etc/salt/pki/minion" ]; then
+        _MN_LCUR_USER=$(stat -c '%U' /etc/salt/pki/minion 2>/dev/null || echo "root")
+        _MN_LCUR_GROUP=$(stat -c '%G' /etc/salt/pki/minion 2>/dev/null || echo "root")
+    elif [ -d "/var/run/salt/minion" ]; then
+        _MN_LCUR_USER=$(stat -c '%U' /var/run/salt/minion 2>/dev/null || echo "root")
+        _MN_LCUR_GROUP=$(stat -c '%G' /var/run/salt/minion 2>/dev/null || echo "root")
     else
-        _MN_LCUR_USER="%{_SALT_USER}"
-        _MN_LCUR_GROUP="%{_SALT_GROUP}"
+        # Default to root:root for minion (matches default runtime user)
+        _MN_LCUR_USER="root"
+        _MN_LCUR_GROUP="root"
     fi
     chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion 2>/dev/null || true
 else
