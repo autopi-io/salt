@@ -454,17 +454,69 @@ usermod -c "%{_SALT_NAME}" \
          %{_SALT_USER}
 
 %pre master
-# No pre-upgrade actions needed for master
+# Save current ownership before upgrade to preserve it
+if [ $1 -gt 1 ] ; then
+    # Upgrade: detect and save current ownership BEFORE rpm overwrites files
+    if [ -d "/var/cache/salt/master" ]; then
+        _MS_PRE_USER=$(stat -c '%U' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_PRE_GROUP=$(stat -c '%G' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_GROUP}")
+    elif [ -d "/etc/salt/pki/master" ]; then
+        _MS_PRE_USER=$(stat -c '%U' /etc/salt/pki/master 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_PRE_GROUP=$(stat -c '%G' /etc/salt/pki/master 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _MS_PRE_USER="%{_SALT_USER}"
+        _MS_PRE_GROUP="%{_SALT_GROUP}"
+    fi
+    echo "${_MS_PRE_USER}:${_MS_PRE_GROUP}" > /tmp/.salt-master-upgrade-ownership
+fi
 
 %pre syndic
-# No pre-upgrade actions needed for syndic
+# Save current ownership before upgrade to preserve it
+if [ $1 -gt 1 ] ; then
+    # Upgrade: detect and save current ownership BEFORE rpm overwrites files
+    if [ -f "/var/log/salt/syndic" ]; then
+        _SY_PRE_USER=$(stat -c '%U' /var/log/salt/syndic 2>/dev/null || echo "%{_SALT_USER}")
+        _SY_PRE_GROUP=$(stat -c '%G' /var/log/salt/syndic 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _SY_PRE_USER="%{_SALT_USER}"
+        _SY_PRE_GROUP="%{_SALT_GROUP}"
+    fi
+    echo "${_SY_PRE_USER}:${_SY_PRE_GROUP}" > /tmp/.salt-syndic-upgrade-ownership
+fi
 
 %pre minion
-# No pre-upgrade actions needed for minion
+# Save current ownership before upgrade to preserve it
+if [ $1 -gt 1 ] ; then
+    # Upgrade: detect and save current ownership BEFORE rpm overwrites files
+    # Check persistent directories to get the current configured ownership
+    if [ -d "/var/cache/salt/minion" ]; then
+        _MN_PRE_USER=$(stat -c '%U' /var/cache/salt/minion 2>/dev/null || echo "root")
+        _MN_PRE_GROUP=$(stat -c '%G' /var/cache/salt/minion 2>/dev/null || echo "root")
+    elif [ -d "/etc/salt/pki/minion" ]; then
+        _MN_PRE_USER=$(stat -c '%U' /etc/salt/pki/minion 2>/dev/null || echo "root")
+        _MN_PRE_GROUP=$(stat -c '%G' /etc/salt/pki/minion 2>/dev/null || echo "root")
+    else
+        _MN_PRE_USER="root"
+        _MN_PRE_GROUP="root"
+    fi
+    # Save to temp file for posttrans to use
+    echo "${_MN_PRE_USER}:${_MN_PRE_GROUP}" > /tmp/.salt-minion-upgrade-ownership
+fi
 
 
 %pre cloud
-# No pre-upgrade actions needed for cloud
+# Save current ownership before upgrade to preserve it
+if [ $1 -gt 1 ] ; then
+    # Upgrade: detect and save current ownership BEFORE rpm overwrites files
+    if [ -d "/etc/salt/cloud.deploy.d" ]; then
+        _CL_PRE_USER=$(stat -c '%U' /etc/salt/cloud.deploy.d 2>/dev/null || echo "%{_SALT_USER}")
+        _CL_PRE_GROUP=$(stat -c '%G' /etc/salt/cloud.deploy.d 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _CL_PRE_USER="%{_SALT_USER}"
+        _CL_PRE_GROUP="%{_SALT_GROUP}"
+    fi
+    echo "${_CL_PRE_USER}:${_CL_PRE_GROUP}" > /tmp/.salt-cloud-upgrade-ownership
+fi
 
 # assumes systemd for RHEL 7 & 8 & 9
 # foregoing %systemd_* scriptlets due to RHEL 7/8 vs. RHEL 9 incompatibilities
@@ -607,12 +659,14 @@ if [ ! -e "/var/log/salt/cloud" ]; then
   chmod 640 /var/log/salt/cloud
 fi
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    # Detect the current user/group from existing directories
-    if [ -d "/etc/salt/cloud.deploy.d" ]; then
-        _MS_LCUR_USER=$(stat -c '%U' /etc/salt/cloud.deploy.d 2>/dev/null || echo "%{_SALT_USER}")
-        _MS_LCUR_GROUP=$(stat -c '%G' /etc/salt/cloud.deploy.d 2>/dev/null || echo "%{_SALT_GROUP}")
+    # Upgrade: restore ownership from saved file
+    if [ -f "/tmp/.salt-cloud-upgrade-ownership" ]; then
+        _CL_SAVED=$(cat /tmp/.salt-cloud-upgrade-ownership)
+        _MS_LCUR_USER="${_CL_SAVED%%:*}"
+        _MS_LCUR_GROUP="${_CL_SAVED##*:}"
+        rm -f /tmp/.salt-cloud-upgrade-ownership
     else
+        # Fallback if file doesn't exist
         _MS_LCUR_USER="%{_SALT_USER}"
         _MS_LCUR_GROUP="%{_SALT_GROUP}"
     fi
@@ -632,20 +686,14 @@ if [ ! -e "/var/log/salt/key" ]; then
   chmod 640 /var/log/salt/key
 fi
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    # Detect the current user/group from existing directories
-    # Check persistent directories first (not /var/run which may be tmpfs)
-    if [ -d "/var/cache/salt/master" ]; then
-        _MS_LCUR_USER=$(stat -c '%U' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_USER}")
-        _MS_LCUR_GROUP=$(stat -c '%G' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_GROUP}")
-    elif [ -d "/etc/salt/pki/master" ]; then
-        _MS_LCUR_USER=$(stat -c '%U' /etc/salt/pki/master 2>/dev/null || echo "%{_SALT_USER}")
-        _MS_LCUR_GROUP=$(stat -c '%G' /etc/salt/pki/master 2>/dev/null || echo "%{_SALT_GROUP}")
-    elif [ -d "/var/run/salt/master" ]; then
-        _MS_LCUR_USER=$(stat -c '%U' /var/run/salt/master 2>/dev/null || echo "%{_SALT_USER}")
-        _MS_LCUR_GROUP=$(stat -c '%G' /var/run/salt/master 2>/dev/null || echo "%{_SALT_GROUP}")
+    # Upgrade: restore ownership from saved file
+    if [ -f "/tmp/.salt-master-upgrade-ownership" ]; then
+        _MS_SAVED=$(cat /tmp/.salt-master-upgrade-ownership)
+        _MS_LCUR_USER="${_MS_SAVED%%:*}"
+        _MS_LCUR_GROUP="${_MS_SAVED##*:}"
+        rm -f /tmp/.salt-master-upgrade-ownership
     else
-        # Default to salt:salt for master (matches default runtime user)
+        # Fallback if file doesn't exist
         _MS_LCUR_USER="%{_SALT_USER}"
         _MS_LCUR_GROUP="%{_SALT_GROUP}"
     fi
@@ -661,12 +709,14 @@ if [ ! -e "/var/log/salt/syndic" ]; then
   chmod 640 /var/log/salt/syndic
 fi
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    # Detect the current user/group from existing directories
-    if [ -f "/var/log/salt/syndic" ]; then
-        _MS_LCUR_USER=$(stat -c '%U' /var/log/salt/syndic 2>/dev/null || echo "%{_SALT_USER}")
-        _MS_LCUR_GROUP=$(stat -c '%G' /var/log/salt/syndic 2>/dev/null || echo "%{_SALT_GROUP}")
+    # Upgrade: restore ownership from saved file
+    if [ -f "/tmp/.salt-syndic-upgrade-ownership" ]; then
+        _SY_SAVED=$(cat /tmp/.salt-syndic-upgrade-ownership)
+        _MS_LCUR_USER="${_SY_SAVED%%:*}"
+        _MS_LCUR_GROUP="${_SY_SAVED##*:}"
+        rm -f /tmp/.salt-syndic-upgrade-ownership
     else
+        # Fallback if file doesn't exist
         _MS_LCUR_USER="%{_SALT_USER}"
         _MS_LCUR_GROUP="%{_SALT_GROUP}"
     fi
@@ -706,20 +756,14 @@ if [ ! -e "/var/log/salt/key" ]; then
   chmod 640 /var/log/salt/key
 fi
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    # Detect the current user/group from existing directories
-    # Check persistent directories first (not /var/run which may be tmpfs)
-    if [ -d "/var/cache/salt/minion" ]; then
-        _MN_LCUR_USER=$(stat -c '%U' /var/cache/salt/minion 2>/dev/null || echo "root")
-        _MN_LCUR_GROUP=$(stat -c '%G' /var/cache/salt/minion 2>/dev/null || echo "root")
-    elif [ -d "/etc/salt/pki/minion" ]; then
-        _MN_LCUR_USER=$(stat -c '%U' /etc/salt/pki/minion 2>/dev/null || echo "root")
-        _MN_LCUR_GROUP=$(stat -c '%G' /etc/salt/pki/minion 2>/dev/null || echo "root")
-    elif [ -d "/var/run/salt/minion" ]; then
-        _MN_LCUR_USER=$(stat -c '%U' /var/run/salt/minion 2>/dev/null || echo "root")
-        _MN_LCUR_GROUP=$(stat -c '%G' /var/run/salt/minion 2>/dev/null || echo "root")
+    # Upgrade: restore ownership from saved file
+    if [ -f "/tmp/.salt-minion-upgrade-ownership" ]; then
+        _MN_SAVED=$(cat /tmp/.salt-minion-upgrade-ownership)
+        _MN_LCUR_USER="${_MN_SAVED%%:*}"
+        _MN_LCUR_GROUP="${_MN_SAVED##*:}"
+        rm -f /tmp/.salt-minion-upgrade-ownership
     else
-        # Default to root:root for minion (matches default runtime user)
+        # Fallback if file doesn't exist (shouldn't happen, but be safe)
         _MN_LCUR_USER="root"
         _MN_LCUR_GROUP="root"
     fi
