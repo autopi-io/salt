@@ -153,11 +153,13 @@ def test_salt_user_ownership_preserved_on_upgrade(
 
         if ret.stdout.strip():
             # Found root-owned files!
-            root_owned_files = ret.stdout.strip().split('\n')
+            root_owned_files = ret.stdout.strip().split("\n")
             pytest.fail(
                 f"Found root-owned files in {dir_path} after running salt-call/salt-pip:\n"
                 + "\n".join(root_owned_files[:10])  # Show first 10 files
                 + f"\n... ({len(root_owned_files)} total root-owned files)"
             )
 
-    log.info("SUCCESS: No root-owned files created, salt-call and salt-pip properly dropped privileges")
+    log.info(
+        "SUCCESS: No root-owned files created, salt-call and salt-pip properly dropped privileges"
+    )

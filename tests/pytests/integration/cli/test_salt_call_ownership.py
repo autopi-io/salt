@@ -32,10 +32,26 @@ if __name__ == '__main__':
 
 @pytest.fixture(scope="module")
 def non_root_minion(salt_master, salt_factories):
-    # Configure minion with current user as 'user'
-    # This ensures the minion runs as the current non-root user
+    # Configure minion with a non-root user
+    # We use 'nobody' which is a standard low-privilege user on most systems
+    # If 'nobody' doesn't exist, we'll try to find another non-root user
+    import pwd
+
+    # Try to find a suitable non-root user
+    non_root_user = None
+    for candidate in ["nobody", "daemon", "bin"]:
+        try:
+            pwd.getpwnam(candidate)
+            non_root_user = candidate
+            break
+        except KeyError:
+            continue
+
+    if not non_root_user:
+        pytest.skip("No suitable non-root user found for testing")
+
     config_overrides = {
-        "user": salt.utils.user.get_user(),
+        "user": non_root_user,
     }
 
     factory = salt_master.salt_minion_daemon(
