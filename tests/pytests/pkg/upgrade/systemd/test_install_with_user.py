@@ -64,19 +64,32 @@ def test_salt_user_ownership_preserved_on_upgrade(
 
     log.info("Testing upgrade from %s to %s", installed_version, upgrade_version)
 
-    # Verify that salt user was created during initial install with SALT_MINION_USER=salt
-    ret = call_cli.run("--local", "user.info", "salt")
-    assert ret.returncode == 0
-    assert ret.data, "salt user should exist after install with SALT_MINION_USER=salt"
+    # The previous version doesn't support SALT_MINION_USER environment variable,
+    # so we need to manually set up salt:salt ownership to simulate a system
+    # that was installed with salt user configuration.
 
-    # Check that salt-minion directories are owned by salt:salt
-    # (because we installed with SALT_MINION_USER=salt environment variable)
+    # First, ensure salt user exists
+    ret = call_cli.run("--local", "user.info", "salt")
+    if ret.returncode != 0 or not ret.data:
+        log.info("Creating salt user for testing")
+        ret = call_cli.run("--local", "user.add", "salt", system=True, createhome=False)
+        assert ret.returncode == 0
+
+    # Define the minion directories
     minion_dirs = [
         "/etc/salt/pki/minion",
         "/var/cache/salt/minion",
         "/var/log/salt",
         "/var/run/salt/minion",
     ]
+
+    # Manually change ownership to salt:salt to simulate a system configured
+    # to run as salt user
+    log.info("Setting up salt:salt ownership on minion directories")
+    for dir_path in minion_dirs:
+        ret = call_cli.run("--local", "cmd.run", f"chown -R salt:salt {dir_path}")
+        if ret.returncode != 0:
+            log.warning("Failed to chown %s, directory may not exist yet", dir_path)
 
     log.info("Verifying pre-upgrade ownership is salt:salt")
     for dir_path in minion_dirs:
@@ -86,15 +99,18 @@ def test_salt_user_ownership_preserved_on_upgrade(
             log.warning("Directory %s does not exist, skipping", dir_path)
             continue
 
-        test_user = ret.stdout.strip().split()[2]
-        test_group = ret.stdout.strip().split()[3]
+        # Use ret.data instead of ret.stdout to get the actual command output
+        # ls -ld output format: perms links user group size date time name
+        parts = ret.data.strip().split()
+        test_user = parts[2]
+        test_group = parts[3]
 
         assert (
             test_user == "salt"
-        ), f"Before upgrade: Expected {dir_path} owned by salt, got {test_user}"
+        ), f"Before upgrade: Expected {dir_path} owned by salt, got {test_user}. Full output: {ret.data}"
         assert (
             test_group == "salt"
-        ), f"Before upgrade: Expected {dir_path} group salt, got {test_group}"
+        ), f"Before upgrade: Expected {dir_path} group salt, got {test_group}. Full output: {ret.data}"
 
     # Now upgrade WITHOUT setting environment variables
     # The RPM %posttrans scriptlet should detect existing ownership and preserve it
@@ -119,15 +135,17 @@ def test_salt_user_ownership_preserved_on_upgrade(
             log.warning("Directory %s does not exist, skipping", dir_path)
             continue
 
-        test_user = ret.stdout.strip().split()[2]
-        test_group = ret.stdout.strip().split()[3]
+        # Use ret.data instead of ret.stdout to get the actual command output
+        parts = ret.data.strip().split()
+        test_user = parts[2]
+        test_group = parts[3]
 
         assert (
             test_user == "salt"
-        ), f"After upgrade: Expected {dir_path} owned by salt, got {test_user}. Ownership was not preserved!"
+        ), f"After upgrade: Expected {dir_path} owned by salt, got {test_user}. Ownership was not preserved! Full output: {ret.data}"
         assert (
             test_group == "salt"
-        ), f"After upgrade: Expected {dir_path} group salt, got {test_group}. Ownership was not preserved!"
+        ), f"After upgrade: Expected {dir_path} group salt, got {test_group}. Ownership was not preserved! Full output: {ret.data}"
 
     log.info("SUCCESS: salt:salt ownership was preserved during upgrade")
 
@@ -139,9 +157,10 @@ def test_salt_user_ownership_preserved_on_upgrade(
     ret = call_cli.run("--local", "--priv=root", "test.ping")
     assert ret.returncode == 0
 
-    # Run salt-pip to verify it also preserves ownership
-    # Use --version which is a read-only operation
-    ret = call_cli.run("--local", "--priv=root", "pip.version")
+    # Run salt-pip directly to install a package into the 'extras' directory
+    # This verifies that salt-pip drops privileges and creates files owned by salt:salt
+    log.info("Installing package via salt-pip to test extras directory ownership")
+    ret = call_cli.run("--local", "--priv=root", "cmd.run", "salt-pip install cowsay")
     assert ret.returncode == 0
 
     # Now verify NO files in the cache directories are owned by root
