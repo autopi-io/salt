@@ -495,7 +495,9 @@ if [ $1 -gt 1 ] ; then
     # Check if user is configured in config files
     if [ -f "/etc/salt/minion" ] && grep -q "^user:" /etc/salt/minion 2>/dev/null; then
         _MN_PRE_USER=$(grep "^user:" /etc/salt/minion | awk '{print $2}' | head -1)
-    elif [ -d "/etc/salt/minion.d" ]; then
+    fi
+
+    if [ -z "$_MN_PRE_USER" ] && [ -d "/etc/salt/minion.d" ]; then
         # Check for user config in minion.d/*.conf files
         for conf in /etc/salt/minion.d/*.conf; do
             if [ -f "$conf" ] && grep -q "^user:" "$conf" 2>/dev/null; then
