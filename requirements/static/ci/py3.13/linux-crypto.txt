@@ -26,7 +26,7 @@ contextvars==2.4
     # via -r requirements/static/pkg/py3.13/linux.txt
 croniter==6.0.0
     # via -r requirements/static/pkg/py3.13/linux.txt
-cryptography==42.0.8
+cryptography==46.0.5
     # via
     #   -r requirements/static/pkg/py3.13/linux.txt
     #   pyopenssl
@@ -111,7 +111,7 @@ pycryptodome==3.23.0
     # via -r requirements/static/ci/crypto.in
 pycryptodomex==3.23.0
     # via -r requirements/static/pkg/py3.13/linux.txt
-pyopenssl==24.3.0
+pyopenssl==25.3.0
     # via -r requirements/static/pkg/py3.13/linux.txt
 python-dateutil==2.9.0.post0
     # via

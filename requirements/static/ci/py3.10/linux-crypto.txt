@@ -30,7 +30,7 @@ contextvars==2.4
     # via -r requirements/static/pkg/py3.10/linux.txt
 croniter==2.0.5
     # via -r requirements/static/pkg/py3.10/linux.txt
-cryptography==42.0.5
+cryptography==46.0.5
     # via
     #   -r requirements/static/pkg/py3.10/linux.txt
     #   pyopenssl
@@ -120,7 +120,7 @@ pycryptodome==3.19.1
     # via -r requirements/static/ci/crypto.in
 pycryptodomex==3.19.1
     # via -r requirements/static/pkg/py3.10/linux.txt
-pyopenssl==24.0.0
+pyopenssl==25.3.0
     # via -r requirements/static/pkg/py3.10/linux.txt
 python-dateutil==2.8.1
     # via
@@ -160,6 +160,8 @@ timelib==0.3.0
 typing-extensions==4.15.0
     # via
     #   -r requirements/static/pkg/py3.10/linux.txt
+    #   cryptography
+    #   pyopenssl
     #   virtualenv
 urllib3==2.6.3
     # via

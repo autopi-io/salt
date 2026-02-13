@@ -24,8 +24,10 @@ contextvars==2.4
     # via -r requirements/static/pkg/py3.10/darwin.txt
 croniter==2.0.5
     # via -r requirements/static/pkg/py3.10/darwin.txt
-cryptography==42.0.5
-    # via -r requirements/static/pkg/py3.10/darwin.txt
+cryptography==46.0.5
+    # via
+    #   -r requirements/static/pkg/py3.10/darwin.txt
+    #   pyopenssl
 distlib==0.4.0
     # via
     #   -r requirements/static/pkg/py3.10/darwin.txt
@@ -91,6 +93,8 @@ pycryptodome==3.19.1
     # via -r requirements/static/ci/crypto.in
 pycryptodomex==3.19.1
     # via -r requirements/static/pkg/py3.10/darwin.txt
+pyopenssl==25.3.0
+    # via -r requirements/static/pkg/py3.10/darwin.txt
 python-dateutil==2.8.0
     # via
     #   -r requirements/static/pkg/py3.10/darwin.txt
@@ -114,6 +118,8 @@ timelib==0.2.5
 typing-extensions==4.15.0
     # via
     #   -r requirements/static/pkg/py3.10/darwin.txt
+    #   cryptography
+    #   pyopenssl
     #   virtualenv
 urllib3==2.6.3
     # via

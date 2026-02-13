@@ -33,7 +33,7 @@ clr-loader==0.2.4
     #   pythonnet
 contextvars==2.4
     # via -r requirements/static/pkg/py3.9/windows.txt
-cryptography==42.0.5
+cryptography==46.0.5
     # via
     #   -r requirements/static/pkg/py3.9/windows.txt
     #   pyopenssl
@@ -139,7 +139,7 @@ pycryptodomex==3.19.1
     # via -r requirements/static/pkg/py3.9/windows.txt
 pymssql==2.3.0
     # via -r requirements/static/pkg/py3.9/windows.txt
-pyopenssl==24.0.0
+pyopenssl==25.3.0
     # via -r requirements/static/pkg/py3.9/windows.txt
 python-dateutil==2.8.1
     # via -r requirements/static/pkg/py3.9/windows.txt
@@ -185,6 +185,8 @@ timelib==0.2.5
 typing-extensions==4.15.0
     # via
     #   -r requirements/static/pkg/py3.9/windows.txt
+    #   cryptography
+    #   pyopenssl
     #   virtualenv
 urllib3==1.26.20
     # via

@@ -20,8 +20,10 @@ contextvars==2.4
     # via -r requirements/static/pkg/py3.13/darwin.txt
 croniter==6.0.0
     # via -r requirements/static/pkg/py3.13/darwin.txt
-cryptography==42.0.8
-    # via -r requirements/static/pkg/py3.13/darwin.txt
+cryptography==46.0.5
+    # via
+    #   -r requirements/static/pkg/py3.13/darwin.txt
+    #   pyopenssl
 distlib==0.4.0
     # via
     #   -r requirements/static/pkg/py3.13/darwin.txt
@@ -86,6 +88,8 @@ pycparser==2.23
 pycryptodome==3.23.0
     # via -r requirements/static/ci/crypto.in
 pycryptodomex==3.23.0
+    # via -r requirements/static/pkg/py3.13/darwin.txt
+pyopenssl==25.3.0
     # via -r requirements/static/pkg/py3.13/darwin.txt
 python-dateutil==2.9.0.post0
     # via

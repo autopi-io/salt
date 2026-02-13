@@ -98,7 +98,6 @@ croniter==2.0.5
     #   -r requirements/static/pkg/py3.12/linux.txt
 cryptography==46.0.5
     # via
-    #   -r requirements/base.txt
     #   -r requirements/static/pkg/linux.in
     #   -r requirements/static/pkg/py3.12/linux.txt
     #   ansible-core
@@ -321,7 +320,10 @@ pynacl==1.5.0
     #   -r requirements/static/ci/common.in
     #   paramiko
 pyopenssl==25.3.0
-    # via etcd3-py
+    # via
+    #   -r requirements/base.txt
+    #   -r requirements/static/pkg/py3.12/linux.txt
+    #   etcd3-py
 pyrsistent==0.17.3
     # via jsonschema
 python-consul==1.1.0
@@ -465,7 +467,9 @@ tornado==6.1
 twilio==7.9.2
     # via -r requirements/static/ci/linux.in
 typing-extensions==4.15.0
-    # via pyopenssl
+    # via
+    #   -r requirements/static/pkg/py3.12/linux.txt
+    #   pyopenssl
 tzlocal==3.0
     # via apscheduler
 urllib3==2.6.3

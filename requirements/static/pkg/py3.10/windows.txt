@@ -27,7 +27,7 @@ clr-loader==0.2.4
 contextvars==2.4
     # via -r requirements/base.txt
 cryptography==46.0.5
-    # via -r requirements/base.txt
+    # via pyopenssl
 distlib==0.4.0
     # via virtualenv
 distro==1.5.0
@@ -109,6 +109,8 @@ pycryptodomex==3.19.1
     # via -r requirements/crypto.txt
 pymssql==2.3.0
     # via -r requirements/windows.txt
+pyopenssl==25.3.0
+    # via -r requirements/base.txt
 python-dateutil==2.8.1
     # via -r requirements/windows.txt
 python-gnupg==0.4.8
@@ -148,6 +150,7 @@ timelib==0.2.5
 typing-extensions==4.15.0
     # via
     #   cryptography
+    #   pyopenssl
     #   virtualenv
 urllib3==2.6.3
     # via

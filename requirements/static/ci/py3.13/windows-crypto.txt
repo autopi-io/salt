@@ -29,7 +29,7 @@ clr-loader==0.2.10
     #   pythonnet
 contextvars==2.4
     # via -r requirements/static/pkg/py3.13/windows.txt
-cryptography==42.0.8
+cryptography==46.0.5
     # via
     #   -r requirements/static/pkg/py3.13/windows.txt
     #   pyopenssl
@@ -130,7 +130,7 @@ pycryptodomex==3.23.0
     # via -r requirements/static/pkg/py3.13/windows.txt
 pymssql==2.3.11
     # via -r requirements/static/pkg/py3.13/windows.txt
-pyopenssl==24.3.0
+pyopenssl==25.3.0
     # via -r requirements/static/pkg/py3.13/windows.txt
 python-dateutil==2.9.0.post0
     # via

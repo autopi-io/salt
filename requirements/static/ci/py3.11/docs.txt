@@ -44,8 +44,8 @@ croniter==2.0.5
     #   -r requirements/static/pkg/py3.11/linux.txt
 cryptography==46.0.5
     # via
-    #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.11/linux.txt
+    #   pyopenssl
 distlib==0.4.0
     # via
     #   -r requirements/static/pkg/py3.11/linux.txt
@@ -173,6 +173,10 @@ pyenchant==3.2.2
     # via sphinxcontrib-spelling
 pygments==2.17.2
     # via sphinx
+pyopenssl==25.3.0
+    # via
+    #   -r requirements/base.txt
+    #   -r requirements/static/pkg/py3.11/linux.txt
 python-dateutil==2.8.1
     # via
     #   -r requirements/static/pkg/py3.11/linux.txt
@@ -244,8 +248,11 @@ timelib==0.3.0
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.11/linux.txt
-typing-extensions==4.8.0
-    # via myst-docutils
+typing-extensions==4.15.0
+    # via
+    #   -r requirements/static/pkg/py3.11/linux.txt
+    #   myst-docutils
+    #   pyopenssl
 uc-micro-py==1.0.1
     # via linkify-it-py
 urllib3==2.6.3

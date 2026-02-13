@@ -32,8 +32,8 @@ croniter==2.0.5
     #   -r requirements/static/pkg/py3.11/darwin.txt
 cryptography==46.0.5
     # via
-    #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.11/darwin.txt
+    #   pyopenssl
 distlib==0.4.0
     # via
     #   -r requirements/static/pkg/py3.11/darwin.txt
@@ -118,6 +118,10 @@ pycryptodomex==3.19.1
     # via
     #   -r requirements/crypto.txt
     #   -r requirements/static/pkg/py3.11/darwin.txt
+pyopenssl==25.3.0
+    # via
+    #   -r requirements/base.txt
+    #   -r requirements/static/pkg/py3.11/darwin.txt
 python-dateutil==2.8.0
     # via
     #   -r requirements/static/pkg/py3.11/darwin.txt
@@ -146,6 +150,10 @@ timelib==0.3.0
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.11/darwin.txt
+typing-extensions==4.15.0
+    # via
+    #   -r requirements/static/pkg/py3.11/darwin.txt
+    #   pyopenssl
 urllib3==2.6.3
     # via
     #   -r requirements/base.txt

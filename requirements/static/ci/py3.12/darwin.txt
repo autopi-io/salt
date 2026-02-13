@@ -87,7 +87,6 @@ croniter==2.0.5
     #   -r requirements/static/pkg/py3.12/darwin.txt
 cryptography==46.0.5
     # via
-    #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.12/darwin.txt
     #   etcd3-py
     #   moto
@@ -292,7 +291,10 @@ pygit2==1.13.1
 pynacl==1.5.0
     # via -r requirements/static/ci/common.in
 pyopenssl==25.3.0
-    # via etcd3-py
+    # via
+    #   -r requirements/base.txt
+    #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   etcd3-py
 pyrsistent==0.17.3
     # via jsonschema
 pytest==8.1.1
@@ -433,6 +435,7 @@ trustme==1.1.0
     # via -r requirements/pytest.txt
 typing-extensions==4.15.0
     # via
+    #   -r requirements/static/pkg/py3.12/darwin.txt
     #   pyopenssl
     #   pytest-system-statistics
 urllib3==2.6.3

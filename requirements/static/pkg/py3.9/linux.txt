@@ -28,8 +28,8 @@ croniter==6.0.0
     # via -r requirements/base.txt
 cryptography==46.0.5
     # via
-    #   -r requirements/base.txt
     #   -r requirements/static/pkg/linux.in
+    #   pyopenssl
 distlib==0.4.0
     # via virtualenv
 distro==1.9.0
@@ -99,6 +99,8 @@ pycryptodomex==3.23.0
     # via -r requirements/crypto.txt
 pygments==2.19.2
     # via rich
+pyopenssl==25.3.0
+    # via -r requirements/base.txt
 python-dateutil==2.9.0.post0
     # via
     #   -r requirements/static/pkg/linux.in
@@ -139,6 +141,7 @@ typer-slim==0.23.0
 typing-extensions==4.15.0
     # via
     #   cryptography
+    #   pyopenssl
     #   virtualenv
 urllib3==1.26.20
     # via
