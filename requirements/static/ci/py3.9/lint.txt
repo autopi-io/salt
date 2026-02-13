@@ -86,7 +86,6 @@ cherrypy==18.10.0
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/ci/common.in
-    #   -r requirements/static/pkg/linux.in
     #   -r requirements/static/pkg/py3.9/linux.txt
 ciscoconfparse==1.5.19
     # via napalm
@@ -109,7 +108,6 @@ croniter==6.0.0
     #   -r requirements/static/pkg/py3.9/linux.txt
 cryptography==46.0.5
     # via
-    #   -r requirements/static/pkg/linux.in
     #   -r requirements/static/pkg/py3.9/linux.txt
     #   etcd3-py
     #   moto

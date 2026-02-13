@@ -77,7 +77,6 @@ cherrypy==18.10.0
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/ci/common.in
-    #   -r requirements/static/pkg/freebsd.in
     #   -r requirements/static/pkg/py3.13/freebsd.txt
 click==8.1.7
     # via geomet
@@ -97,7 +96,6 @@ croniter==6.0.0 ; sys_platform != 'win32'
     #   -r requirements/static/pkg/py3.13/freebsd.txt
 cryptography==46.0.5
     # via
-    #   -r requirements/static/pkg/freebsd.in
     #   -r requirements/static/pkg/py3.13/freebsd.txt
     #   etcd3-py
     #   moto

@@ -85,7 +85,6 @@ cherrypy==18.10.0
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/ci/common.in
-    #   -r requirements/static/pkg/linux.in
     #   -r requirements/static/pkg/py3.12/linux.txt
 click==7.1.1
     # via geomet
@@ -101,7 +100,6 @@ croniter==2.0.5
     #   -r requirements/static/pkg/py3.12/linux.txt
 cryptography==46.0.5
     # via
-    #   -r requirements/static/pkg/linux.in
     #   -r requirements/static/pkg/py3.12/linux.txt
     #   ansible-core
     #   etcd3-py

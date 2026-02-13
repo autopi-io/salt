@@ -20,17 +20,13 @@ cheroot==11.1.2
     #   -r requirements/static/pkg/freebsd.in
     #   cherrypy
 cherrypy==18.10.0
-    # via
-    #   -r requirements/base.txt
-    #   -r requirements/static/pkg/freebsd.in
+    # via -r requirements/base.txt
 contextvars==2.4
     # via -r requirements/base.txt
 croniter==2.0.5 ; sys_platform != 'win32'
     # via -r requirements/base.txt
 cryptography==46.0.5
-    # via
-    #   -r requirements/static/pkg/freebsd.in
-    #   pyopenssl
+    # via pyopenssl
 distlib==0.4.0
     # via virtualenv
 distro==1.5.0

@@ -19,9 +19,7 @@ cheroot==11.1.2
     #   -r requirements/static/pkg/linux.in
     #   cherrypy
 cherrypy==18.10.0
-    # via
-    #   -r requirements/base.txt
-    #   -r requirements/static/pkg/linux.in
+    # via -r requirements/base.txt
 click==8.1.8
     # via typer
 contextvars==2.4
@@ -29,9 +27,7 @@ contextvars==2.4
 croniter==6.0.0
     # via -r requirements/base.txt
 cryptography==46.0.5
-    # via
-    #   -r requirements/static/pkg/linux.in
-    #   pyopenssl
+    # via pyopenssl
 distlib==0.4.0
     # via virtualenv
 distro==1.9.0
