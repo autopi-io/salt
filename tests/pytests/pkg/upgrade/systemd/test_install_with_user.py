@@ -147,6 +147,16 @@ def test_salt_user_ownership_preserved_on_upgrade(
     install_salt_systemd.install(upgrade=True)
     time.sleep(10)  # Allow time for services to restart
 
+    # Capture the debug log created by RPM scriptlets
+    log.info("Capturing RPM upgrade debug log")
+    ret = call_cli.run("--local", "--priv=root", "cmd.run", "cat /var/log/salt-upgrade-debug.log")
+    if ret.returncode == 0:
+        log.info("=== RPM UPGRADE DEBUG LOG START ===")
+        log.info(ret.data)
+        log.info("=== RPM UPGRADE DEBUG LOG END ===")
+    else:
+        log.warning("Could not read /var/log/salt-upgrade-debug.log: %s", ret.data)
+
     # Verify we upgraded successfully
     ret = call_cli.run("--local", "--priv=root", "test.version")
     assert ret.returncode == 0
