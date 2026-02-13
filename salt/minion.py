@@ -12,6 +12,7 @@ import logging
 import multiprocessing
 import os
 import random
+import shutil
 import signal
 import stat
 import sys
@@ -1291,12 +1292,25 @@ class Minion(MinionBase):
         # was killed forcefully (SIGKILL). This ensures recovery on restart.
         for lock_name in ("state_queue.lock", "job_queue.lock"):
             lock_path = os.path.join(self.opts["cachedir"], lock_name)
-            if os.path.isfile(lock_path):
+            if os.path.exists(lock_path):
                 try:
-                    os.remove(lock_path)
-                    log.info("Removed stale lock file: %s", lock_path)
-                except OSError:
-                    pass
+                    if os.path.isfile(lock_path):
+                        os.remove(lock_path)
+                        log.info("Removed stale lock file: %s", lock_path)
+                    elif os.path.isdir(lock_path):
+                        shutil.rmtree(lock_path)
+                        log.warning(
+                            "Removed stale lock directory (should be file): %s. "
+                            "This may indicate a bug in lock creation.",
+                            lock_path,
+                        )
+                    else:
+                        log.warning(
+                            "Lock path %s exists but is neither file nor directory", lock_path
+                        )
+                        os.remove(lock_path)
+                except OSError as exc:
+                    log.error("Failed to remove stale lock %s: %s", lock_path, exc)
 
         self.timeout = timeout
         self.safe = safe
