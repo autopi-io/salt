@@ -491,12 +491,17 @@ if [ $1 -gt 1 ] ; then
     echo "=== SALT UPGRADE DEBUG: %pre minion starting ===" >> /var/log/salt-upgrade-debug.log 2>&1
     echo "Timestamp: $(date)" >> /var/log/salt-upgrade-debug.log 2>&1
 
-    # Stop the minion before upgrade to prevent permission conflicts
+    # Stop and mask the minion before upgrade to prevent permission conflicts
     # When minion runs as non-root user and files get temporarily owned by root during upgrade,
-    # the running minion can encounter permission denied errors
+    # the running minion can encounter permission denied errors.
+    # Masking prevents the OLD package's %postun from restarting the service before we fix ownership.
     echo "Stopping salt-minion service..." >> /var/log/salt-upgrade-debug.log 2>&1
     /bin/systemctl stop salt-minion.service >/dev/null 2>&1 || :
     echo "Service stopped, status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+
+    echo "Masking salt-minion service to prevent OLD package from starting it..." >> /var/log/salt-upgrade-debug.log 2>&1
+    /bin/systemctl mask salt-minion.service >/dev/null 2>&1 || :
+    echo "Service masked, is-enabled: $(/bin/systemctl is-enabled salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
 
     # Upgrade: detect and save current ownership BEFORE rpm overwrites files
     # Try to detect the user from the config first, then fall back to directory ownership
@@ -885,8 +890,12 @@ if [ $1 -gt 1 ] ; then
         fi
     fi
 
-    # Now that ownership is restored, start the minion service
-    # We stopped it in %pre, so we need to start it, not just try-restart
+    # Now that ownership is restored, unmask and start the minion service
+    # We masked it in %pre to prevent OLD package from starting it with wrong ownership
+    echo "Unmasking salt-minion service..." >> /var/log/salt-upgrade-debug.log 2>&1
+    /bin/systemctl unmask salt-minion.service >> /var/log/salt-upgrade-debug.log 2>&1 || :
+    echo "Service unmasked, is-enabled: $(/bin/systemctl is-enabled salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+
     echo "Starting salt-minion service..." >> /var/log/salt-upgrade-debug.log 2>&1
     /bin/systemctl start salt-minion.service >> /var/log/salt-upgrade-debug.log 2>&1 || :
     echo "Service started, status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
