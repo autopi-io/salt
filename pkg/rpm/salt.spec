@@ -487,10 +487,17 @@ fi
 %pre minion
 # Save current ownership before upgrade to preserve it
 if [ $1 -gt 1 ] ; then
+    # Debug logging
+    echo "=== SALT UPGRADE DEBUG: %pre minion starting ===" >> /var/log/salt-upgrade-debug.log 2>&1
+    echo "Timestamp: $(date)" >> /var/log/salt-upgrade-debug.log 2>&1
+
     # Stop the minion before upgrade to prevent permission conflicts
     # When minion runs as non-root user and files get temporarily owned by root during upgrade,
     # the running minion can encounter permission denied errors
+    echo "Stopping salt-minion service..." >> /var/log/salt-upgrade-debug.log 2>&1
     /bin/systemctl stop salt-minion.service >/dev/null 2>&1 || :
+    echo "Service stopped, status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+
     # Upgrade: detect and save current ownership BEFORE rpm overwrites files
     # Try to detect the user from the config first, then fall back to directory ownership
     _MN_PRE_USER=""
@@ -529,9 +536,14 @@ if [ $1 -gt 1 ] ; then
     fi
 
     # Only save if we found a non-root user, otherwise let posttrans use root default
+    echo "Detected user: '$_MN_PRE_USER', group: '$_MN_PRE_GROUP'" >> /var/log/salt-upgrade-debug.log 2>&1
     if [ -n "$_MN_PRE_USER" ] && [ "$_MN_PRE_USER" != "root" ] && [ -n "$_MN_PRE_GROUP" ]; then
         echo "${_MN_PRE_USER}:${_MN_PRE_GROUP}" > /tmp/.salt-minion-upgrade-ownership
+        echo "Saved ownership to /tmp/.salt-minion-upgrade-ownership" >> /var/log/salt-upgrade-debug.log 2>&1
+    else
+        echo "Not saving ownership (user is root or not found)" >> /var/log/salt-upgrade-debug.log 2>&1
     fi
+    echo "=== SALT UPGRADE DEBUG: %pre minion complete ===" >> /var/log/salt-upgrade-debug.log 2>&1
 fi
 
 
@@ -820,29 +832,40 @@ if [ ! -e "/var/log/salt/key" ]; then
   chmod 640 /var/log/salt/key
 fi
 if [ $1 -gt 1 ] ; then
+    # Debug logging
+    echo "=== SALT UPGRADE DEBUG: %posttrans minion starting ===" >> /var/log/salt-upgrade-debug.log 2>&1
+    echo "Timestamp: $(date)" >> /var/log/salt-upgrade-debug.log 2>&1
+    echo "Service status before ownership fix: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+
     # Upgrade: restore ownership from saved file
     if [ -f "/tmp/.salt-minion-upgrade-ownership" ]; then
         _MN_SAVED=$(cat /tmp/.salt-minion-upgrade-ownership)
         _MN_LCUR_USER="${_MN_SAVED%%:*}"
         _MN_LCUR_GROUP="${_MN_SAVED##*:}"
+        echo "Read ownership from file: user='$_MN_LCUR_USER', group='$_MN_LCUR_GROUP'" >> /var/log/salt-upgrade-debug.log 2>&1
         rm -f /tmp/.salt-minion-upgrade-ownership
     else
         # Fallback if file doesn't exist (shouldn't happen, but be safe)
         _MN_LCUR_USER="root"
         _MN_LCUR_GROUP="root"
+        echo "WARNING: Ownership file not found, defaulting to root:root" >> /var/log/salt-upgrade-debug.log 2>&1
     fi
 
     # Fix ownership on each path individually, only if it exists
     # This is more robust than a single chown -R command that could fail partway through
+    echo "Fixing ownership to ${_MN_LCUR_USER}:${_MN_LCUR_GROUP}..." >> /var/log/salt-upgrade-debug.log 2>&1
     for _MN_DIR in /etc/salt/pki/minion /etc/salt/minion.d /var/cache/salt/minion /var/run/salt/minion; do
         if [ -e "$_MN_DIR" ]; then
-            chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} "$_MN_DIR"
+            echo "  chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} $_MN_DIR" >> /var/log/salt-upgrade-debug.log 2>&1
+            chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} "$_MN_DIR" 2>> /var/log/salt-upgrade-debug.log
         fi
     done
     # Handle log file separately (it's a file, not a directory)
     if [ -e /var/log/salt/minion ]; then
-        chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion
+        echo "  chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion" >> /var/log/salt-upgrade-debug.log 2>&1
+        chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion 2>> /var/log/salt-upgrade-debug.log
     fi
+    echo "Ownership fix complete" >> /var/log/salt-upgrade-debug.log 2>&1
 
     # If upgrading and ownership was non-root, ensure user config is set
     if [ "$_MN_LCUR_USER" != "root" ] && [ -n "$_MN_LCUR_USER" ]; then
@@ -862,8 +885,12 @@ if [ $1 -gt 1 ] ; then
         fi
     fi
 
-    # Now that ownership is restored, restart the minion service
-    /bin/systemctl try-restart salt-minion.service >/dev/null 2>&1 || :
+    # Now that ownership is restored, start the minion service
+    # We stopped it in %pre, so we need to start it, not just try-restart
+    echo "Starting salt-minion service..." >> /var/log/salt-upgrade-debug.log 2>&1
+    /bin/systemctl start salt-minion.service >> /var/log/salt-upgrade-debug.log 2>&1 || :
+    echo "Service started, status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+    echo "=== SALT UPGRADE DEBUG: %posttrans minion complete ===" >> /var/log/salt-upgrade-debug.log 2>&1
 else
     # Fresh install: check for environment variables to configure ownership
     _MN_INSTALL_USER="${SALT_MINION_USER:-root}"
@@ -926,11 +953,18 @@ if [ $1 -ge 1 ] ; then
 fi
 
 %postun minion
+# Debug logging
+echo "=== SALT UPGRADE DEBUG: %postun minion (NEW package) starting ===" >> /var/log/salt-upgrade-debug.log 2>&1
+echo "Timestamp: $(date)" >> /var/log/salt-upgrade-debug.log 2>&1
+echo "Parameter \$1 = $1 (0=uninstall, 1=upgrade)" >> /var/log/salt-upgrade-debug.log 2>&1
+echo "Service status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+
 # %%systemd_postun_with_restart salt-minion.service
 /bin/systemctl daemon-reload >/dev/null 2>&1 || :
 # Note: We do NOT restart here during upgrade because ownership hasn't been restored yet.
 # The restart happens in %posttrans after ownership is fixed.
 if [ $1 -eq 0 ]; then
+  echo "This is an uninstall, cleaning up FIPS files" >> /var/log/salt-upgrade-debug.log 2>&1
   if [ $(cat /etc/os-release | grep VERSION_ID | cut -d '=' -f 2 | sed  's/\"//g' | cut -d '.' -f 1) = "8" ]; then
     if [ -z "$(rpm -qi salt-master | grep Name | grep salt-master)" ]; then
       # uninstall and no master running
@@ -942,7 +976,10 @@ if [ $1 -eq 0 ]; then
       fi
     fi
   fi
+else
+  echo "This is an upgrade, NOT restarting service here (will be done in %posttrans)" >> /var/log/salt-upgrade-debug.log 2>&1
 fi
+echo "=== SALT UPGRADE DEBUG: %postun minion (NEW package) complete ===" >> /var/log/salt-upgrade-debug.log 2>&1
 
 %postun api
 # %%systemd_postun_with_restart salt-api.service
