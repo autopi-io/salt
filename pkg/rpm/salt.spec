@@ -487,6 +487,10 @@ fi
 %pre minion
 # Save current ownership before upgrade to preserve it
 if [ $1 -gt 1 ] ; then
+    # Stop the minion before upgrade to prevent permission conflicts
+    # When minion runs as non-root user and files get temporarily owned by root during upgrade,
+    # the running minion can encounter permission denied errors
+    /bin/systemctl stop salt-minion.service >/dev/null 2>&1 || :
     # Upgrade: detect and save current ownership BEFORE rpm overwrites files
     # Try to detect the user from the config first, then fall back to directory ownership
     _MN_PRE_USER=""
