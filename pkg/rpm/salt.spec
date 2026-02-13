@@ -846,6 +846,9 @@ if [ $1 -gt 1 ] ; then
             chmod 644 /etc/salt/minion.d/user.conf
         fi
     fi
+
+    # Now that ownership is restored, restart the minion service
+    /bin/systemctl try-restart salt-minion.service >/dev/null 2>&1 || :
 else
     # Fresh install: check for environment variables to configure ownership
     _MN_INSTALL_USER="${SALT_MINION_USER:-root}"
@@ -900,10 +903,8 @@ fi
 %postun minion
 # %%systemd_postun_with_restart salt-minion.service
 /bin/systemctl daemon-reload >/dev/null 2>&1 || :
-if [ $1 -ge 1 ] ; then
-  # Package upgrade, not uninstall
-  /bin/systemctl try-restart salt-minion.service >/dev/null 2>&1 || :
-fi
+# Note: We do NOT restart here during upgrade because ownership hasn't been restored yet.
+# The restart happens in %posttrans after ownership is fixed.
 if [ $1 -eq 0 ]; then
   if [ $(cat /etc/os-release | grep VERSION_ID | cut -d '=' -f 2 | sed  's/\"//g' | cut -d '.' -f 1) = "8" ]; then
     if [ -z "$(rpm -qi salt-master | grep Name | grep salt-master)" ]; then
