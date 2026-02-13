@@ -96,7 +96,7 @@ croniter==2.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.10/linux.txt
-cryptography==42.0.5
+cryptography==46.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/linux.in
@@ -337,11 +337,8 @@ pynacl==1.5.0
     # via
     #   -r requirements/static/ci/common.in
     #   paramiko
-pyopenssl==24.0.0
-    # via
-    #   -r requirements/static/pkg/linux.in
-    #   -r requirements/static/pkg/py3.10/linux.txt
-    #   etcd3-py
+pyopenssl==25.3.0
+    # via etcd3-py
 pyparsing==3.0.9
     # via junos-eznc
 pypsexec==0.1.0
@@ -529,6 +526,8 @@ trustme==1.1.0
 typing-extensions==4.15.0
     # via
     #   -r requirements/static/pkg/py3.10/linux.txt
+    #   cryptography
+    #   pyopenssl
     #   pytest-system-statistics
     #   virtualenv
 urllib3==2.6.3

@@ -42,11 +42,10 @@ croniter==2.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.10/linux.txt
-cryptography==42.0.5
+cryptography==46.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.10/linux.txt
-    #   pyopenssl
 distlib==0.4.0
     # via
     #   -r requirements/static/pkg/py3.10/linux.txt
@@ -174,8 +173,6 @@ pyenchant==3.2.2
     # via sphinxcontrib-spelling
 pygments==2.17.2
     # via sphinx
-pyopenssl==24.0.0
-    # via -r requirements/static/pkg/py3.10/linux.txt
 python-dateutil==2.8.1
     # via
     #   -r requirements/static/pkg/py3.10/linux.txt
@@ -250,6 +247,7 @@ timelib==0.3.0
 typing-extensions==4.15.0
     # via
     #   -r requirements/static/pkg/py3.10/linux.txt
+    #   cryptography
     #   myst-docutils
     #   virtualenv
 uc-micro-py==1.0.1

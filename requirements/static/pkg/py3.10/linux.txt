@@ -24,11 +24,10 @@ contextvars==2.4
     # via -r requirements/base.txt
 croniter==2.0.5
     # via -r requirements/base.txt
-cryptography==42.0.5
+cryptography==46.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/linux.in
-    #   pyopenssl
 distlib==0.4.0
     # via virtualenv
 distro==1.5.0
@@ -95,8 +94,6 @@ pycparser==2.21
     #   cffi
 pycryptodomex==3.19.1
     # via -r requirements/crypto.txt
-pyopenssl==24.0.0
-    # via -r requirements/static/pkg/linux.in
 python-dateutil==2.8.1
     # via
     #   -r requirements/static/pkg/linux.in
@@ -128,7 +125,9 @@ tempora==4.1.1
 timelib==0.3.0
     # via -r requirements/base.txt
 typing-extensions==4.15.0
-    # via virtualenv
+    # via
+    #   cryptography
+    #   virtualenv
 urllib3==2.6.3
     # via
     #   -r requirements/base.txt

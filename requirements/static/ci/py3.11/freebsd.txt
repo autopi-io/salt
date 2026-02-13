@@ -94,7 +94,7 @@ croniter==2.0.5 ; sys_platform != 'win32'
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.11/freebsd.txt
-cryptography==42.0.5
+cryptography==46.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/freebsd.in
@@ -311,11 +311,8 @@ pynacl==1.5.0
     # via
     #   -r requirements/static/ci/common.in
     #   paramiko
-pyopenssl==24.0.0
-    # via
-    #   -r requirements/static/pkg/freebsd.in
-    #   -r requirements/static/pkg/py3.11/freebsd.txt
-    #   etcd3-py
+pyopenssl==25.3.0
+    # via etcd3-py
 pyrsistent==0.17.3
     # via jsonschema
 pytest==8.1.1
@@ -469,8 +466,10 @@ toml==0.10.2
     # via -r requirements/static/ci/common.in
 trustme==1.1.0
     # via -r requirements/pytest.txt
-typing-extensions==4.8.0
-    # via pytest-system-statistics
+typing-extensions==4.15.0
+    # via
+    #   pyopenssl
+    #   pytest-system-statistics
 urllib3==2.6.3
     # via
     #   -r requirements/base.txt

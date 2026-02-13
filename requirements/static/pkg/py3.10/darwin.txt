@@ -30,7 +30,7 @@ croniter==2.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.10/darwin.txt
-cryptography==42.0.5
+cryptography==46.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.10/darwin.txt
@@ -149,6 +149,7 @@ timelib==0.2.5
 typing-extensions==4.15.0
     # via
     #   -r requirements/static/pkg/py3.10/darwin.txt
+    #   cryptography
     #   virtualenv
 urllib3==2.6.3
     # via

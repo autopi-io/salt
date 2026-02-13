@@ -45,12 +45,11 @@ croniter==2.0.5 ; sys_platform != 'win32'
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.9/freebsd.txt
-cryptography==42.0.5
+cryptography==46.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/freebsd.in
     #   -r requirements/static/pkg/py3.9/freebsd.txt
-    #   pyopenssl
 distlib==0.4.0
     # via
     #   -r requirements/static/pkg/py3.9/freebsd.txt
@@ -163,10 +162,6 @@ pycryptodomex==3.19.1
     # via
     #   -r requirements/crypto.txt
     #   -r requirements/static/pkg/py3.9/freebsd.txt
-pyopenssl==24.0.0
-    # via
-    #   -r requirements/static/pkg/freebsd.in
-    #   -r requirements/static/pkg/py3.9/freebsd.txt
 python-dateutil==2.8.1
     # via
     #   -r requirements/static/pkg/freebsd.in
@@ -230,6 +225,7 @@ timelib==0.3.0
 typing-extensions==4.15.0 ; python_full_version < '3.11'
     # via
     #   -r requirements/static/pkg/py3.9/freebsd.txt
+    #   cryptography
     #   virtualenv
 urllib3==1.26.20 ; python_full_version < '3.10'
     # via

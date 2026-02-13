@@ -38,11 +38,10 @@ croniter==6.0.0
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.13/linux.txt
-cryptography==42.0.8
+cryptography==46.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.13/linux.txt
-    #   pyopenssl
 distlib==0.4.0
     # via
     #   -r requirements/static/pkg/py3.13/linux.txt
@@ -165,8 +164,6 @@ pyenchant==3.2.2
     # via sphinxcontrib-spelling
 pygments==2.18.0
     # via sphinx
-pyopenssl==24.3.0
-    # via -r requirements/static/pkg/py3.13/linux.txt
 python-dateutil==2.9.0.post0
     # via
     #   -r requirements/static/pkg/py3.13/linux.txt

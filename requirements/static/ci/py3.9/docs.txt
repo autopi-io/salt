@@ -46,11 +46,10 @@ croniter==6.0.0
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.9/linux.txt
-cryptography==42.0.8
+cryptography==46.0.5
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.9/linux.txt
-    #   pyopenssl
 distlib==0.4.0
     # via
     #   -r requirements/static/pkg/py3.9/linux.txt
@@ -182,8 +181,6 @@ pygments==2.19.2
     #   -r requirements/static/pkg/py3.9/linux.txt
     #   rich
     #   sphinx
-pyopenssl==24.3.0
-    # via -r requirements/static/pkg/py3.9/linux.txt
 python-dateutil==2.9.0.post0
     # via
     #   -r requirements/static/pkg/py3.9/linux.txt
@@ -274,6 +271,7 @@ typer-slim==0.23.0
 typing-extensions==4.15.0
     # via
     #   -r requirements/static/pkg/py3.9/linux.txt
+    #   cryptography
     #   virtualenv
 uc-micro-py==1.0.1
     # via linkify-it-py
