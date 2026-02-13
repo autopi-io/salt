@@ -212,7 +212,7 @@ looseversion==1.0.2
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.11/windows.txt
-lxml==4.9.1
+lxml==6.0.2
     # via
     #   -r requirements/static/pkg/py3.11/windows.txt
     #   -r requirements/windows.txt

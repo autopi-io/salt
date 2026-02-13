@@ -91,7 +91,7 @@ jmespath==1.0.1
     # via -r requirements/static/pkg/py3.12/windows.txt
 looseversion==1.0.2
     # via -r requirements/static/pkg/py3.12/windows.txt
-lxml==4.9.1
+lxml==6.0.2
     # via -r requirements/static/pkg/py3.12/windows.txt
 m2crypto==0.37.1
     # via -r requirements/static/ci/crypto.in
