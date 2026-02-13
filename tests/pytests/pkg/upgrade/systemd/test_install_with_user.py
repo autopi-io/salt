@@ -131,6 +131,16 @@ def test_salt_user_ownership_preserved_on_upgrade(
             test_group == "salt"
         ), f"Before upgrade: Expected {dir_path} group salt, got {test_group}. Full output: {ret.data}"
 
+    # Stop the minion before upgrade to avoid permission conflicts during file replacement
+    # When minion runs as non-root user, the upgrade temporarily installs files as root,
+    # which can cause permission denied errors if minion tries to access them during upgrade
+    log.info("Stopping minion before upgrade")
+    ret = call_cli.run(
+        "--local", "--priv=root", "cmd.run", "systemctl stop salt-minion"
+    )
+    assert ret.returncode == 0
+    time.sleep(2)  # Wait for minion to fully stop
+
     # Now upgrade WITHOUT setting environment variables
     # The RPM %posttrans scriptlet should detect existing ownership and preserve it
     log.info("Upgrading to version %s WITHOUT environment variables", upgrade_version)
