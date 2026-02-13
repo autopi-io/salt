@@ -225,7 +225,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/freebsd.in
-          - requirements/static/pkg/py3.9/freebsd.txt
           - --universal
           - --python-version=3.9
           - --no-emit-index-url
@@ -240,7 +239,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/freebsd.in
-          - requirements/static/pkg/py3.10/freebsd.txt
           - --universal
           - --python-version=3.10
           - --no-emit-index-url
@@ -255,7 +253,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/freebsd.in
-          - requirements/static/pkg/py3.11/freebsd.txt
           - --universal
           - --python-version=3.11
           - --no-emit-index-url
@@ -270,7 +267,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/freebsd.in
-          - requirements/static/pkg/py3.12/freebsd.txt
           - --universal
           - --python-version=3.12
           - --no-emit-index-url
@@ -285,7 +281,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/freebsd.in
-          - requirements/static/pkg/py3.13/freebsd.txt
           - --universal
           - --python-version=3.13
           - --no-emit-index-url
@@ -301,7 +296,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/darwin.in
-          - requirements/static/pkg/py3.9/darwin.txt
           - --python-platform=macos
           - --python-version=3.9
           - --no-emit-index-url
@@ -316,7 +310,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/darwin.in
-          - requirements/static/pkg/py3.10/darwin.txt
           - --python-platform=macos
           - --python-version=3.10
           - --no-emit-index-url
@@ -331,7 +324,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/darwin.in
-          - requirements/static/pkg/py3.11/darwin.txt
           - --python-platform=macos
           - --python-version=3.11
           - --no-emit-index-url
@@ -346,7 +338,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/darwin.in
-          - requirements/static/pkg/py3.12/darwin.txt
           - --python-platform=macos
           - --python-version=3.12
           - --no-emit-index-url
@@ -361,7 +352,6 @@ repos:
           - requirements/base.txt
           - requirements/zeromq.txt
           - requirements/static/pkg/darwin.in
-          - requirements/static/pkg/py3.13/darwin.txt
           - --python-platform=macos
           - --python-version=3.13
           - --no-emit-index-url
