@@ -55,7 +55,7 @@ cachetools==4.2.2
     #   python-telegram-bot
 cassandra-driver==3.29.3
     # via -r requirements/static/ci/common.in
-certifi==2024.7.4
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.11/linux.txt
@@ -85,6 +85,7 @@ cheroot==11.1.2
     #   cherrypy
 cherrypy==18.10.0
     # via
+    #   -r requirements/base.txt
     #   -r requirements/static/ci/common.in
     #   -r requirements/static/pkg/linux.in
     #   -r requirements/static/pkg/py3.11/linux.txt

@@ -2,7 +2,7 @@
 #    uv pip compile requirements/windows.txt requirements/static/pkg/windows.in --python-platform=windows --python-version=3.12 --no-emit-index-url -o=requirements/static/pkg/py3.12/windows.txt
 autocommand==2.2.2
     # via jaraco-text
-certifi==2024.7.4
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   requests
@@ -18,8 +18,8 @@ cheroot==11.1.2
     # via
     #   -r requirements/windows.txt
     #   cherrypy
-cherrypy==18.6.1
-    # via -r requirements/windows.txt
+cherrypy==18.10.0
+    # via -r requirements/base.txt
 clr-loader==0.2.6
     # via pythonnet
 contextvars==2.4

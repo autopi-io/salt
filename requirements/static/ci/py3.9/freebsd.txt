@@ -49,13 +49,7 @@ botocore==1.39.3
     #   s3transfer
 cassandra-driver==3.29.3
     # via -r requirements/static/ci/common.in
-certifi==2023.7.22 ; python_full_version < '3.10'
-    # via
-    #   -r requirements/base.txt
-    #   -r requirements/static/pkg/py3.9/freebsd.txt
-    #   kubernetes
-    #   requests
-certifi==2026.1.4 ; python_full_version >= '3.10'
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.9/freebsd.txt
@@ -86,6 +80,7 @@ cheroot==11.1.2
     #   cherrypy
 cherrypy==18.10.0
     # via
+    #   -r requirements/base.txt
     #   -r requirements/static/ci/common.in
     #   -r requirements/static/pkg/freebsd.in
     #   -r requirements/static/pkg/py3.9/freebsd.txt

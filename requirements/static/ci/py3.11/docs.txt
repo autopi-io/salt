@@ -12,7 +12,7 @@ backports-tarfile==1.2.0
     # via
     #   -r requirements/static/pkg/py3.11/linux.txt
     #   jaraco-context
-certifi==2024.7.4
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.11/linux.txt
@@ -32,6 +32,7 @@ cheroot==11.1.2
     #   cherrypy
 cherrypy==18.10.0
     # via
+    #   -r requirements/base.txt
     #   -r requirements/static/ci/docs.in
     #   -r requirements/static/pkg/py3.11/linux.txt
 contextvars==2.4

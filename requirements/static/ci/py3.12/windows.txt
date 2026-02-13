@@ -35,7 +35,7 @@ botocore==1.39.3
     #   s3transfer
 cassandra-driver==3.29.3
     # via -r requirements/static/ci/common.in
-certifi==2024.7.4
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   -r requirements/static/pkg/py3.12/windows.txt
@@ -62,11 +62,11 @@ cheroot==11.1.2
     #   -r requirements/static/pkg/py3.12/windows.txt
     #   -r requirements/windows.txt
     #   cherrypy
-cherrypy==18.6.1
+cherrypy==18.10.0
     # via
+    #   -r requirements/base.txt
     #   -r requirements/static/ci/common.in
     #   -r requirements/static/pkg/py3.12/windows.txt
-    #   -r requirements/windows.txt
 click==7.1.2
     # via geomet
 clr-loader==0.2.6

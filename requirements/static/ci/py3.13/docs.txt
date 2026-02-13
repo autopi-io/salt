@@ -28,6 +28,7 @@ cheroot==11.1.2
     #   cherrypy
 cherrypy==18.10.0
     # via
+    #   -r requirements/base.txt
     #   -r requirements/static/ci/docs.in
     #   -r requirements/static/pkg/py3.13/linux.txt
 contextvars==2.4

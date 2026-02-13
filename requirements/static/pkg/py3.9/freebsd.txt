@@ -4,11 +4,7 @@ autocommand==2.2.2
     # via jaraco-text
 backports-tarfile==1.2.0 ; python_full_version < '3.12'
     # via jaraco-context
-certifi==2023.7.22 ; python_full_version < '3.10'
-    # via
-    #   -r requirements/base.txt
-    #   requests
-certifi==2026.1.4 ; python_full_version >= '3.10'
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   requests
@@ -24,7 +20,9 @@ cheroot==11.1.2
     #   -r requirements/static/pkg/freebsd.in
     #   cherrypy
 cherrypy==18.10.0
-    # via -r requirements/static/pkg/freebsd.in
+    # via
+    #   -r requirements/base.txt
+    #   -r requirements/static/pkg/freebsd.in
 contextvars==2.4
     # via -r requirements/base.txt
 croniter==2.0.5 ; sys_platform != 'win32'

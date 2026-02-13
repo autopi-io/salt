@@ -2,7 +2,7 @@
 #    uv pip compile requirements/base.txt requirements/zeromq.txt requirements/static/pkg/freebsd.in --universal --python-version=3.12 --no-emit-index-url -o=requirements/static/pkg/py3.12/freebsd.txt
 autocommand==2.2.2
     # via jaraco-text
-certifi==2024.7.4
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   requests
@@ -18,7 +18,9 @@ cheroot==11.1.2
     #   -r requirements/static/pkg/freebsd.in
     #   cherrypy
 cherrypy==18.10.0
-    # via -r requirements/static/pkg/freebsd.in
+    # via
+    #   -r requirements/base.txt
+    #   -r requirements/static/pkg/freebsd.in
 contextvars==2.4
     # via -r requirements/base.txt
 croniter==2.0.5 ; sys_platform != 'win32'

@@ -66,9 +66,9 @@ cheroot==11.1.2
     #   cherrypy
 cherrypy==18.10.0
     # via
+    #   -r requirements/base.txt
     #   -r requirements/static/ci/common.in
     #   -r requirements/static/pkg/py3.13/windows.txt
-    #   -r requirements/windows.txt
 click==8.1.7
     # via geomet
 clr-loader==0.2.10

@@ -4,7 +4,7 @@ autocommand==2.2.2
     # via jaraco-text
 backports-tarfile==1.2.0
     # via jaraco-context
-certifi==2024.7.4
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   requests
@@ -20,8 +20,8 @@ cheroot==11.1.2
     # via
     #   -r requirements/windows.txt
     #   cherrypy
-cherrypy==18.6.1
-    # via -r requirements/windows.txt
+cherrypy==18.10.0
+    # via -r requirements/base.txt
 clr-loader==0.2.4
     # via pythonnet
 contextvars==2.4

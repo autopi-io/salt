@@ -19,7 +19,7 @@ cheroot==11.1.2
     #   -r requirements/windows.txt
     #   cherrypy
 cherrypy==18.10.0
-    # via -r requirements/windows.txt
+    # via -r requirements/base.txt
 clr-loader==0.2.10
     # via pythonnet
 contextvars==2.4

@@ -4,7 +4,7 @@ annotated-doc==0.0.4
     # via typer
 backports-tarfile==1.2.0
     # via jaraco-context
-certifi==2023.7.22
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   requests
@@ -19,7 +19,9 @@ cheroot==11.1.2
     #   -r requirements/static/pkg/linux.in
     #   cherrypy
 cherrypy==18.10.0
-    # via -r requirements/static/pkg/linux.in
+    # via
+    #   -r requirements/base.txt
+    #   -r requirements/static/pkg/linux.in
 click==8.1.8
     # via typer
 contextvars==2.4

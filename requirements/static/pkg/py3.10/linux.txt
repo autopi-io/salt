@@ -4,7 +4,7 @@ autocommand==2.2.2
     # via jaraco-text
 backports-tarfile==1.2.0
     # via jaraco-context
-certifi==2024.7.4
+certifi==2026.1.4
     # via
     #   -r requirements/base.txt
     #   requests
@@ -19,7 +19,9 @@ cheroot==11.1.2
     #   -r requirements/static/pkg/linux.in
     #   cherrypy
 cherrypy==18.10.0
-    # via -r requirements/static/pkg/linux.in
+    # via
+    #   -r requirements/base.txt
+    #   -r requirements/static/pkg/linux.in
 contextvars==2.4
     # via -r requirements/base.txt
 croniter==2.0.5

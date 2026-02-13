@@ -18,7 +18,9 @@ cheroot==11.1.2
     #   -r requirements/static/pkg/freebsd.in
     #   cherrypy
 cherrypy==18.10.0
-    # via -r requirements/static/pkg/freebsd.in
+    # via
+    #   -r requirements/base.txt
+    #   -r requirements/static/pkg/freebsd.in
 contextvars==2.4
     # via -r requirements/base.txt
 croniter==6.0.0 ; sys_platform != 'win32'

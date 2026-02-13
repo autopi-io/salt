@@ -70,11 +70,13 @@ cheetah3==3.2.6.post1
 cheroot==11.1.2
     # via
     #   -r requirements/darwin.txt
+    #   -r requirements/static/pkg/py3.13/darwin.txt
     #   cherrypy
 cherrypy==18.10.0
     # via
-    #   -r requirements/darwin.txt
+    #   -r requirements/base.txt
     #   -r requirements/static/ci/common.in
+    #   -r requirements/static/pkg/py3.13/darwin.txt
 click==8.1.7
     # via geomet
 clustershell==1.9.2
@@ -159,7 +161,9 @@ importlib-metadata==8.7.1
 iniconfig==2.0.0
     # via pytest
 jaraco-collections==5.2.1
-    # via cherrypy
+    # via
+    #   -r requirements/static/pkg/py3.13/darwin.txt
+    #   cherrypy
 jaraco-context==6.1.0
     # via
     #   -r requirements/static/pkg/py3.13/darwin.txt
@@ -259,7 +263,9 @@ platformdirs==4.5.1
 pluggy==1.5.0
     # via pytest
 portend==3.2.1
-    # via cherrypy
+    # via
+    #   -r requirements/static/pkg/py3.13/darwin.txt
+    #   cherrypy
 propcache==0.2.0
     # via yarl
 psutil==7.2.1
@@ -401,6 +407,7 @@ setproctitle==1.3.7
 setuptools==82.0.0
     # via
     #   -c requirements/constraints.txt
+    #   -r requirements/static/pkg/py3.13/darwin.txt
     #   zc-lockfile
 six==1.17.0
     # via
@@ -420,7 +427,9 @@ sqlparse==0.5.1
 strict-rfc3339==0.7
     # via -r requirements/static/ci/common.in
 tempora==5.8.1
-    # via portend
+    # via
+    #   -r requirements/static/pkg/py3.13/darwin.txt
+    #   portend
 textfsm==1.1.3
     # via -r requirements/static/ci/common.in
 timelib==0.3.0
@@ -476,7 +485,9 @@ yamlordereddictloader==0.4.2
 yarl==1.16.0
     # via aiohttp
 zc-lockfile==4.0
-    # via cherrypy
+    # via
+    #   -r requirements/static/pkg/py3.13/darwin.txt
+    #   cherrypy
 zipp==3.23.0
     # via
     #   -r requirements/darwin.txt
