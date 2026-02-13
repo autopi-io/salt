@@ -113,9 +113,7 @@ rpm-vercmp==0.1.2
 setproctitle==1.3.2
     # via -r requirements/static/pkg/linux.in
 setuptools==82.0.0
-    # via
-    #   -c requirements/constraints.txt
-    #   zc-lockfile
+    # via zc-lockfile
 six==1.16.0
     # via python-dateutil
 tempora==4.1.1

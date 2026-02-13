@@ -97,9 +97,7 @@ pyzmq==25.1.2
 requests==2.32.5
     # via -r requirements/base.txt
 setuptools==82.0.0
-    # via
-    #   -c requirements/constraints.txt
-    #   zc-lockfile
+    # via zc-lockfile
 six==1.16.0
     # via python-dateutil
 tempora==5.8.1

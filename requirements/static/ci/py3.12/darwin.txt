@@ -401,7 +401,6 @@ setproctitle==1.3.2
     # via -r requirements/darwin.txt
 setuptools==82.0.0
     # via
-    #   -c requirements/constraints.txt
     #   -r requirements/static/pkg/py3.12/darwin.txt
     #   jsonschema
     #   pygit2
