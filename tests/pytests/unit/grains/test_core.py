@@ -5610,6 +5610,7 @@ def test__ps():
     }
 
 
+@pytest.mark.skip_unless_on_linux
 def test_alfalinux_os_grains():
     _os_release_data = {
         "NAME": "alfaLinux",
@@ -5617,6 +5618,7 @@ def test_alfalinux_os_grains():
         "ID": "alfalinux",
         "VERSION_ID": "1",
     }
+
     expectation = {
         "os": "alfaLinux",
         "os_family": "Suse",
@@ -5627,9 +5629,11 @@ def test_alfalinux_os_grains():
         "osrelease_info": (1,),
         "osmajorrelease": 1,
     }
+
     _run_os_grains_tests(_os_release_data, {}, expectation)
 
 
+@pytest.mark.skip_unless_on_linux
 def test_alfalinux_rise_os_grains():
     _os_release_data = {
         "NAME": "alfaLinux Rise",
@@ -5637,6 +5641,7 @@ def test_alfalinux_rise_os_grains():
         "ID": "alfalinux-rise",
         "VERSION_ID": "1",
     }
+
     expectation = {
         "os": "alfaLinux Rise",
         "os_family": "Suse",
@@ -5647,9 +5652,11 @@ def test_alfalinux_rise_os_grains():
         "osrelease_info": (1,),
         "osmajorrelease": 1,
     }
+
     _run_os_grains_tests(_os_release_data, {}, expectation)
 
 
+@pytest.mark.skip_unless_on_linux
 def test_alteros_os_grains():
     _os_release_data = {
         "NAME": "AlterOS",
@@ -5657,6 +5664,7 @@ def test_alteros_os_grains():
         "ID": "alteros",
         "VERSION_ID": "1",
     }
+
     expectation = {
         "os": "AlterOS",
         "os_family": "RedHat",
@@ -5667,9 +5675,11 @@ def test_alteros_os_grains():
         "osrelease_info": (1,),
         "osmajorrelease": 1,
     }
+
     _run_os_grains_tests(_os_release_data, {}, expectation)
 
 
+@pytest.mark.skip_unless_on_linux
 def test_red_os_os_grains():
     _os_release_data = {
         "NAME": "RED OS",
@@ -5677,6 +5687,7 @@ def test_red_os_os_grains():
         "ID": "redos",
         "VERSION_ID": "1",
     }
+
     expectation = {
         "os": "RED OS",
         "os_family": "RedHat",
@@ -5687,5 +5698,6 @@ def test_red_os_os_grains():
         "osrelease_info": (1,),
         "osmajorrelease": 1,
     }
+
     _run_os_grains_tests(_os_release_data, {}, expectation)
 
