@@ -4,7 +4,7 @@ autocommand==2.2.2
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
     #   jaraco-text
-certifi==2024.7.4
+certifi==2026.1.4
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
     #   requests
@@ -16,6 +16,12 @@ charset-normalizer==3.2.0
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
     #   requests
+cheroot==11.1.2
+    # via
+    #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   cherrypy
+cherrypy==18.10.0
+    # via -r requirements/static/pkg/py3.12/darwin.txt
 contextvars==2.4
     # via -r requirements/static/pkg/py3.12/darwin.txt
 croniter==2.0.5
@@ -44,6 +50,10 @@ immutables==0.21
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
     #   contextvars
+jaraco-collections==5.2.1
+    # via
+    #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   cherrypy
 jaraco-context==6.0.1
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
@@ -51,9 +61,13 @@ jaraco-context==6.0.1
 jaraco-functools==4.2.1
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   cheroot
     #   jaraco-text
+    #   tempora
 jaraco-text==4.0.0
-    # via -r requirements/static/pkg/py3.12/darwin.txt
+    # via
+    #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   jaraco-collections
 jinja2==3.1.6
     # via -r requirements/static/pkg/py3.12/darwin.txt
 jmespath==1.0.1
@@ -69,6 +83,8 @@ markupsafe==2.1.2
 more-itertools==10.7.0
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   cheroot
+    #   cherrypy
     #   jaraco-functools
     #   jaraco-text
 msgpack==1.0.2
@@ -79,6 +95,10 @@ platformdirs==4.5.1
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
     #   virtualenv
+portend==3.2.1
+    # via
+    #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   cherrypy
 psutil==5.8.0
     # via -r requirements/static/pkg/py3.12/darwin.txt
 pycparser==2.21
@@ -95,6 +115,7 @@ python-dateutil==2.8.0
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
     #   croniter
+    #   tempora
 pytz==2022.1
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
@@ -105,10 +126,18 @@ pyzmq==25.1.2
     # via -r requirements/static/pkg/py3.12/darwin.txt
 requests==2.32.5
     # via -r requirements/static/pkg/py3.12/darwin.txt
+setuptools==82.0.0
+    # via
+    #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   zc-lockfile
 six==1.16.0
     # via
     #   -r requirements/static/pkg/py3.12/darwin.txt
     #   python-dateutil
+tempora==5.8.1
+    # via
+    #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   portend
 timelib==0.3.0
     # via -r requirements/static/pkg/py3.12/darwin.txt
 typing-extensions==4.15.0
@@ -121,3 +150,7 @@ urllib3==2.6.3
     #   requests
 virtualenv==20.36.1
     # via -r requirements/static/pkg/py3.12/darwin.txt
+zc-lockfile==4.0
+    # via
+    #   -r requirements/static/pkg/py3.12/darwin.txt
+    #   cherrypy

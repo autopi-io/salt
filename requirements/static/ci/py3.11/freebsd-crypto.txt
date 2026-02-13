@@ -8,7 +8,7 @@ backports-tarfile==1.2.0 ; python_full_version < '3.12'
     # via
     #   -r requirements/static/pkg/py3.11/freebsd.txt
     #   jaraco-context
-certifi==2024.7.4
+certifi==2026.1.4
     # via
     #   -r requirements/static/pkg/py3.11/freebsd.txt
     #   requests
