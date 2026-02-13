@@ -827,7 +827,18 @@ if [ $1 -gt 1 ] ; then
         _MN_LCUR_USER="root"
         _MN_LCUR_GROUP="root"
     fi
-    chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion 2>/dev/null || true
+
+    # Fix ownership on each path individually, only if it exists
+    # This is more robust than a single chown -R command that could fail partway through
+    for _MN_DIR in /etc/salt/pki/minion /etc/salt/minion.d /var/cache/salt/minion /var/run/salt/minion; do
+        if [ -e "$_MN_DIR" ]; then
+            chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} "$_MN_DIR"
+        fi
+    done
+    # Handle log file separately (it's a file, not a directory)
+    if [ -e /var/log/salt/minion ]; then
+        chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion
+    fi
 
     # If upgrading and ownership was non-root, ensure user config is set
     if [ "$_MN_LCUR_USER" != "root" ] && [ -n "$_MN_LCUR_USER" ]; then
@@ -853,7 +864,17 @@ else
     # Fresh install: check for environment variables to configure ownership
     _MN_INSTALL_USER="${SALT_MINION_USER:-root}"
     _MN_INSTALL_GROUP="${SALT_MINION_GROUP:-root}"
-    chown -R ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion 2>/dev/null || true
+
+    # Fix ownership on each path individually, only if it exists
+    for _MN_DIR in /etc/salt/pki/minion /etc/salt/minion.d /var/cache/salt/minion /var/run/salt/minion; do
+        if [ -e "$_MN_DIR" ]; then
+            chown -R ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP} "$_MN_DIR"
+        fi
+    done
+    # Handle log file separately
+    if [ -e /var/log/salt/minion ]; then
+        chown ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP} /var/log/salt/minion
+    fi
 
     # If SALT_MINION_USER is set and not root, configure minion to run as that user
     if [ -n "$SALT_MINION_USER" ] && [ "$SALT_MINION_USER" != "root" ]; then
