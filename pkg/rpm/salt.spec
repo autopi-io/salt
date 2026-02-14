@@ -491,17 +491,10 @@ if [ $1 -gt 1 ] ; then
     echo "=== SALT UPGRADE DEBUG: %pre minion starting ===" >> /var/log/salt-upgrade-debug.log 2>&1
     echo "Timestamp: $(date)" >> /var/log/salt-upgrade-debug.log 2>&1
 
-    # Stop and mask the minion before upgrade to prevent permission conflicts
-    # When minion runs as non-root user and files get temporarily owned by root during upgrade,
-    # the running minion can encounter permission denied errors.
-    # Masking prevents the OLD package's %postun from restarting the service before we fix ownership.
+    # Stop the minion before upgrade
     echo "Stopping salt-minion service..." >> /var/log/salt-upgrade-debug.log 2>&1
     /bin/systemctl stop salt-minion.service >/dev/null 2>&1 || :
     echo "Service stopped, status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
-
-    echo "Masking salt-minion service to prevent OLD package from starting it..." >> /var/log/salt-upgrade-debug.log 2>&1
-    /bin/systemctl mask salt-minion.service >/dev/null 2>&1 || :
-    echo "Service masked, is-enabled: $(/bin/systemctl is-enabled salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
 
     # Upgrade: detect and save current ownership BEFORE rpm overwrites files
     # Try to detect the user from the config first, then fall back to directory ownership
@@ -678,7 +671,54 @@ if [ $1 -lt 2 ]; then
 fi
 # %%systemd_post salt-minion.service
 if [ $1 -gt 1 ] ; then
-  # Upgrade
+  # Upgrade: restore ownership BEFORE restarting service
+  # This prevents permission errors when OLD package's %postun tries to restart
+  if [ -f "/tmp/.salt-minion-upgrade-ownership" ]; then
+      _MN_SAVED=$(cat /tmp/.salt-minion-upgrade-ownership)
+      _MN_LCUR_USER="${_MN_SAVED%%:*}"
+      _MN_LCUR_GROUP="${_MN_SAVED##*:}"
+      echo "Restoring ownership to ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} in %post" >> /var/log/salt-upgrade-debug.log 2>&1
+      rm -f /tmp/.salt-minion-upgrade-ownership
+  else
+      # Fallback if file doesn't exist (shouldn't happen, but be safe)
+      _MN_LCUR_USER="root"
+      _MN_LCUR_GROUP="root"
+      echo "WARNING: Ownership file not found in %post, defaulting to root:root" >> /var/log/salt-upgrade-debug.log 2>&1
+  fi
+
+  # Fix ownership on each path individually, only if it exists
+  for _MN_DIR in /etc/salt/pki/minion /etc/salt/minion.d /var/cache/salt/minion /var/run/salt/minion; do
+      if [ -e "$_MN_DIR" ]; then
+          echo "  chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} $_MN_DIR" >> /var/log/salt-upgrade-debug.log 2>&1
+          chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} "$_MN_DIR" 2>> /var/log/salt-upgrade-debug.log
+      fi
+  done
+  # Handle log file separately (it's a file, not a directory)
+  if [ -e /var/log/salt/minion ]; then
+      echo "  chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion" >> /var/log/salt-upgrade-debug.log 2>&1
+      chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion 2>> /var/log/salt-upgrade-debug.log
+  fi
+  echo "Ownership restored in %post, now trying to restart service" >> /var/log/salt-upgrade-debug.log 2>&1
+
+  # If upgrading and ownership was non-root, ensure user config is set
+  if [ "$_MN_LCUR_USER" != "root" ] && [ -n "$_MN_LCUR_USER" ]; then
+      # Check if user is already configured
+      _MN_USER_CONFIGURED=0
+      if grep -q "^user:" /etc/salt/minion 2>/dev/null; then
+          _MN_USER_CONFIGURED=1
+      elif [ -d /etc/salt/minion.d ] && grep -q "^user:" /etc/salt/minion.d/*.conf 2>/dev/null; then
+          _MN_USER_CONFIGURED=1
+      fi
+
+      # Only set if not already configured
+      if [ $_MN_USER_CONFIGURED -eq 0 ]; then
+          mkdir -p /etc/salt/minion.d
+          echo "user: ${_MN_LCUR_USER}" > /etc/salt/minion.d/user.conf
+          chmod 644 /etc/salt/minion.d/user.conf
+          echo "Created /etc/salt/minion.d/user.conf with user: ${_MN_LCUR_USER}" >> /var/log/salt-upgrade-debug.log 2>&1
+      fi
+  fi
+
   /bin/systemctl try-restart salt-minion.service >/dev/null 2>&1 || :
 else
   # Initial installation
@@ -837,69 +877,10 @@ if [ ! -e "/var/log/salt/key" ]; then
   chmod 640 /var/log/salt/key
 fi
 if [ $1 -gt 1 ] ; then
-    # Debug logging
-    echo "=== SALT UPGRADE DEBUG: %posttrans minion starting ===" >> /var/log/salt-upgrade-debug.log 2>&1
-    echo "Timestamp: $(date)" >> /var/log/salt-upgrade-debug.log 2>&1
-    echo "Service status before ownership fix: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
-
-    # Upgrade: restore ownership from saved file
-    if [ -f "/tmp/.salt-minion-upgrade-ownership" ]; then
-        _MN_SAVED=$(cat /tmp/.salt-minion-upgrade-ownership)
-        _MN_LCUR_USER="${_MN_SAVED%%:*}"
-        _MN_LCUR_GROUP="${_MN_SAVED##*:}"
-        echo "Read ownership from file: user='$_MN_LCUR_USER', group='$_MN_LCUR_GROUP'" >> /var/log/salt-upgrade-debug.log 2>&1
-        rm -f /tmp/.salt-minion-upgrade-ownership
-    else
-        # Fallback if file doesn't exist (shouldn't happen, but be safe)
-        _MN_LCUR_USER="root"
-        _MN_LCUR_GROUP="root"
-        echo "WARNING: Ownership file not found, defaulting to root:root" >> /var/log/salt-upgrade-debug.log 2>&1
-    fi
-
-    # Fix ownership on each path individually, only if it exists
-    # This is more robust than a single chown -R command that could fail partway through
-    echo "Fixing ownership to ${_MN_LCUR_USER}:${_MN_LCUR_GROUP}..." >> /var/log/salt-upgrade-debug.log 2>&1
-    for _MN_DIR in /etc/salt/pki/minion /etc/salt/minion.d /var/cache/salt/minion /var/run/salt/minion; do
-        if [ -e "$_MN_DIR" ]; then
-            echo "  chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} $_MN_DIR" >> /var/log/salt-upgrade-debug.log 2>&1
-            chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} "$_MN_DIR" 2>> /var/log/salt-upgrade-debug.log
-        fi
-    done
-    # Handle log file separately (it's a file, not a directory)
-    if [ -e /var/log/salt/minion ]; then
-        echo "  chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion" >> /var/log/salt-upgrade-debug.log 2>&1
-        chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion 2>> /var/log/salt-upgrade-debug.log
-    fi
-    echo "Ownership fix complete" >> /var/log/salt-upgrade-debug.log 2>&1
-
-    # If upgrading and ownership was non-root, ensure user config is set
-    if [ "$_MN_LCUR_USER" != "root" ] && [ -n "$_MN_LCUR_USER" ]; then
-        # Check if user is already configured
-        _MN_USER_CONFIGURED=0
-        if grep -q "^user:" /etc/salt/minion 2>/dev/null; then
-            _MN_USER_CONFIGURED=1
-        elif [ -d /etc/salt/minion.d ] && grep -q "^user:" /etc/salt/minion.d/*.conf 2>/dev/null; then
-            _MN_USER_CONFIGURED=1
-        fi
-
-        # Only set if not already configured
-        if [ $_MN_USER_CONFIGURED -eq 0 ]; then
-            mkdir -p /etc/salt/minion.d
-            echo "user: ${_MN_LCUR_USER}" > /etc/salt/minion.d/user.conf
-            chmod 644 /etc/salt/minion.d/user.conf
-        fi
-    fi
-
-    # Now that ownership is restored, unmask and start the minion service
-    # We masked it in %pre to prevent OLD package from starting it with wrong ownership
-    echo "Unmasking salt-minion service..." >> /var/log/salt-upgrade-debug.log 2>&1
-    /bin/systemctl unmask salt-minion.service >> /var/log/salt-upgrade-debug.log 2>&1 || :
-    echo "Service unmasked, is-enabled: $(/bin/systemctl is-enabled salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
-
-    echo "Starting salt-minion service..." >> /var/log/salt-upgrade-debug.log 2>&1
-    /bin/systemctl start salt-minion.service >> /var/log/salt-upgrade-debug.log 2>&1 || :
-    echo "Service started, status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
-    echo "=== SALT UPGRADE DEBUG: %posttrans minion complete ===" >> /var/log/salt-upgrade-debug.log 2>&1
+    # Upgrade: log final status
+    echo "=== SALT UPGRADE DEBUG: %posttrans minion ===" >> /var/log/salt-upgrade-debug.log 2>&1
+    echo "Service status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+    echo "Upgrade complete" >> /var/log/salt-upgrade-debug.log 2>&1
 else
     # Fresh install: check for environment variables to configure ownership
     _MN_INSTALL_USER="${SALT_MINION_USER:-root}"
