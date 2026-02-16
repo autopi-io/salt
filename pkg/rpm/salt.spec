@@ -699,6 +699,8 @@ if [ $1 -gt 1 ] ; then
       chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion 2>> /var/log/salt-upgrade-debug.log
   fi
   echo "Ownership restored in %post, now trying to restart service" >> /var/log/salt-upgrade-debug.log 2>&1
+  # Create marker file to tell %posttrans this was an upgrade
+  touch /tmp/.salt-minion-upgrade-ownership.done
 
   # If upgrading and ownership was non-root, ensure user config is set
   if [ "$_MN_LCUR_USER" != "root" ] && [ -n "$_MN_LCUR_USER" ]; then
@@ -868,6 +870,10 @@ else
 fi
 
 %posttrans minion
+# Debug: log the parameter to understand upgrade vs fresh install detection
+echo "=== SALT UPGRADE DEBUG: %posttrans minion ===" >> /var/log/salt-upgrade-debug.log 2>&1
+echo "Parameter \$1 = $1" >> /var/log/salt-upgrade-debug.log 2>&1
+
 if [ ! -e "/var/log/salt/minion" ]; then
   touch /var/log/salt/minion
   chmod 640 /var/log/salt/minion
@@ -876,19 +882,23 @@ if [ ! -e "/var/log/salt/key" ]; then
   touch /var/log/salt/key
   chmod 640 /var/log/salt/key
 fi
-if [ $1 -gt 1 ] ; then
-    # Upgrade: log final status
-    echo "=== SALT UPGRADE DEBUG: %posttrans minion ===" >> /var/log/salt-upgrade-debug.log 2>&1
+
+# Check if /tmp/.salt-minion-upgrade-ownership exists to detect if this was an upgrade
+if [ -f "/tmp/.salt-minion-upgrade-ownership.done" ] || [ $1 -ge 2 ] ; then
+    # This was an upgrade - ownership already restored in %post, just log
+    echo "Detected upgrade (ownership already restored in %post)" >> /var/log/salt-upgrade-debug.log 2>&1
     echo "Service status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
-    echo "Upgrade complete" >> /var/log/salt-upgrade-debug.log 2>&1
+    rm -f /tmp/.salt-minion-upgrade-ownership.done
 else
     # Fresh install: check for environment variables to configure ownership
+    echo "Detected fresh install" >> /var/log/salt-upgrade-debug.log 2>&1
     _MN_INSTALL_USER="${SALT_MINION_USER:-root}"
     _MN_INSTALL_GROUP="${SALT_MINION_GROUP:-root}"
 
     # Fix ownership on each path individually, only if it exists
     for _MN_DIR in /etc/salt/pki/minion /etc/salt/minion.d /var/cache/salt/minion /var/run/salt/minion; do
         if [ -e "$_MN_DIR" ]; then
+            echo "  Setting ownership on $_MN_DIR to ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP}" >> /var/log/salt-upgrade-debug.log 2>&1
             chown -R ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP} "$_MN_DIR"
         fi
     done
@@ -904,6 +914,7 @@ else
         chmod 644 /etc/salt/minion.d/user.conf
     fi
 fi
+echo "=== SALT UPGRADE DEBUG: %posttrans minion complete ===" >> /var/log/salt-upgrade-debug.log 2>&1
 
 
 %preun
