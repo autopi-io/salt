@@ -454,40 +454,109 @@ usermod -c "%{_SALT_NAME}" \
          %{_SALT_USER}
 
 %pre master
+# Save current ownership before upgrade to preserve it
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    _MS_LCUR_USER=$(ls -dl /run/salt/master | cut -d ' ' -f 3)
-    _MS_LCUR_GROUP=$(ls -dl /run/salt/master | cut -d ' ' -f 4)
-    %global _MS_CUR_USER  %{_MS_LCUR_USER}
-    %global _MS_CUR_GROUP %{_MS_LCUR_GROUP}
+    # Upgrade: detect and save current ownership BEFORE rpm overwrites files
+    if [ -d "/var/cache/salt/master" ]; then
+        _MS_PRE_USER=$(stat -c '%U' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_PRE_GROUP=$(stat -c '%G' /var/cache/salt/master 2>/dev/null || echo "%{_SALT_GROUP}")
+    elif [ -d "/etc/salt/pki/master" ]; then
+        _MS_PRE_USER=$(stat -c '%U' /etc/salt/pki/master 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_PRE_GROUP=$(stat -c '%G' /etc/salt/pki/master 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _MS_PRE_USER="%{_SALT_USER}"
+        _MS_PRE_GROUP="%{_SALT_GROUP}"
+    fi
+    echo "${_MS_PRE_USER}:${_MS_PRE_GROUP}" > /tmp/.salt-master-upgrade-ownership
 fi
 
 %pre syndic
+# Save current ownership before upgrade to preserve it
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    _MS_LCUR_USER=$(ls -dl /run/salt/master | cut -d ' ' -f 3)
-    _MS_LCUR_GROUP=$(ls -dl /run/salt/master | cut -d ' ' -f 4)
-    %global _MS_CUR_USER  %{_MS_LCUR_USER}
-    %global _MS_CUR_GROUP %{_MS_LCUR_GROUP}
+    # Upgrade: detect and save current ownership BEFORE rpm overwrites files
+    if [ -f "/var/log/salt/syndic" ]; then
+        _SY_PRE_USER=$(stat -c '%U' /var/log/salt/syndic 2>/dev/null || echo "%{_SALT_USER}")
+        _SY_PRE_GROUP=$(stat -c '%G' /var/log/salt/syndic 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _SY_PRE_USER="%{_SALT_USER}"
+        _SY_PRE_GROUP="%{_SALT_GROUP}"
+    fi
+    echo "${_SY_PRE_USER}:${_SY_PRE_GROUP}" > /tmp/.salt-syndic-upgrade-ownership
 fi
 
 %pre minion
+# Save current ownership before upgrade to preserve it
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    _MN_LCUR_USER=$(ls -dl /run/salt/minion | cut -d ' ' -f 3)
-    _MN_LCUR_GROUP=$(ls -dl /run/salt/minion | cut -d ' ' -f 4)
-    %global _MN_CUR_USER  %{_MN_LCUR_USER}
-    %global _MN_CUR_GROUP %{_MN_LCUR_GROUP}
+    # Debug logging
+    echo "=== SALT UPGRADE DEBUG: %pre minion starting ===" >> /var/log/salt-upgrade-debug.log 2>&1
+    echo "Timestamp: $(date)" >> /var/log/salt-upgrade-debug.log 2>&1
+
+    # Stop the minion before upgrade
+    echo "Stopping salt-minion service..." >> /var/log/salt-upgrade-debug.log 2>&1
+    /bin/systemctl stop salt-minion.service >/dev/null 2>&1 || :
+    echo "Service stopped, status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+
+    # Upgrade: detect and save current ownership BEFORE rpm overwrites files
+    # Try to detect the user from the config first, then fall back to directory ownership
+    _MN_PRE_USER=""
+    _MN_PRE_GROUP=""
+
+    # Check if user is configured in config files
+    if [ -f "/etc/salt/minion" ] && grep -q "^user:" /etc/salt/minion 2>/dev/null; then
+        _MN_PRE_USER=$(grep "^user:" /etc/salt/minion | awk '{print $2}' | head -1)
+    fi
+
+    if [ -z "$_MN_PRE_USER" ] && [ -d "/etc/salt/minion.d" ]; then
+        # Check for user config in minion.d/*.conf files
+        for conf in /etc/salt/minion.d/*.conf; do
+            if [ -f "$conf" ] && grep -q "^user:" "$conf" 2>/dev/null; then
+                _MN_PRE_USER=$(grep "^user:" "$conf" | awk '{print $2}' | head -1)
+                break
+            fi
+        done
+    fi
+
+    # If user found in config, get their primary group
+    if [ -n "$_MN_PRE_USER" ] && [ "$_MN_PRE_USER" != "root" ]; then
+        _MN_PRE_GROUP=$(id -gn "$_MN_PRE_USER" 2>/dev/null || echo "")
+    fi
+
+    # If we still don't have a user, check directory ownership
+    if [ -z "$_MN_PRE_USER" ]; then
+        # Check persistent directories to get the current configured ownership
+        if [ -d "/var/cache/salt/minion" ]; then
+            _MN_PRE_USER=$(stat -c '%U' /var/cache/salt/minion 2>/dev/null || echo "")
+            _MN_PRE_GROUP=$(stat -c '%G' /var/cache/salt/minion 2>/dev/null || echo "")
+        elif [ -d "/etc/salt/pki/minion" ]; then
+            _MN_PRE_USER=$(stat -c '%U' /etc/salt/pki/minion 2>/dev/null || echo "")
+            _MN_PRE_GROUP=$(stat -c '%G' /etc/salt/pki/minion 2>/dev/null || echo "")
+        fi
+    fi
+
+    # Only save if we found a non-root user, otherwise let posttrans use root default
+    echo "Detected user: '$_MN_PRE_USER', group: '$_MN_PRE_GROUP'" >> /var/log/salt-upgrade-debug.log 2>&1
+    if [ -n "$_MN_PRE_USER" ] && [ "$_MN_PRE_USER" != "root" ] && [ -n "$_MN_PRE_GROUP" ]; then
+        echo "${_MN_PRE_USER}:${_MN_PRE_GROUP}" > /tmp/.salt-minion-upgrade-ownership
+        echo "Saved ownership to /tmp/.salt-minion-upgrade-ownership" >> /var/log/salt-upgrade-debug.log 2>&1
+    else
+        echo "Not saving ownership (user is root or not found)" >> /var/log/salt-upgrade-debug.log 2>&1
+    fi
+    echo "=== SALT UPGRADE DEBUG: %pre minion complete ===" >> /var/log/salt-upgrade-debug.log 2>&1
 fi
 
 
 %pre cloud
+# Save current ownership before upgrade to preserve it
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    _MS_LCUR_USER=$(ls -dl /etc/salt/cloud.deploy.d | cut -d ' ' -f 3)
-    _MS_LCUR_GROUP=$(ls -dl /etc/salt/cloud.deploy.d | cut -d ' ' -f 4)
-    %global _MS_CUR_USER  %{_MS_LCUR_USER}
-    %global _MS_CUR_GROUP %{_MS_LCUR_GROUP}
+    # Upgrade: detect and save current ownership BEFORE rpm overwrites files
+    if [ -d "/etc/salt/cloud.deploy.d" ]; then
+        _CL_PRE_USER=$(stat -c '%U' /etc/salt/cloud.deploy.d 2>/dev/null || echo "%{_SALT_USER}")
+        _CL_PRE_GROUP=$(stat -c '%G' /etc/salt/cloud.deploy.d 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _CL_PRE_USER="%{_SALT_USER}"
+        _CL_PRE_GROUP="%{_SALT_GROUP}"
+    fi
+    echo "${_CL_PRE_USER}:${_CL_PRE_GROUP}" > /tmp/.salt-cloud-upgrade-ownership
 fi
 
 # assumes systemd for RHEL 7 & 8 & 9
@@ -582,6 +651,13 @@ ln -s -f /opt/saltstack/salt/salt-call %{_bindir}/salt-call
 ln -s -f /opt/saltstack/salt/salt-proxy %{_bindir}/salt-proxy
 if [ $1 -lt 2 ]; then
   # install
+  # Check for environment variables to configure minion user/group
+  if [ -n "$SALT_MINION_USER" ]; then
+    # Add user to additional groups if specified
+    if [ -n "$SALT_MINION_GROUPS" ]; then
+      usermod -a -G "$SALT_MINION_GROUPS" "$SALT_MINION_USER" 2>/dev/null || :
+    fi
+  fi
   # ensure hmac are up to date, master or minion, rest install one or the other
   # key used is from openssl/crypto/fips/fips_standalone_hmac.c openssl 1.1.1k
   if [ $(cat /etc/os-release | grep VERSION_ID | cut -d '=' -f 2 | sed  's/\"//g' | cut -d '.' -f 1) = "8" ]; then
@@ -595,7 +671,56 @@ if [ $1 -lt 2 ]; then
 fi
 # %%systemd_post salt-minion.service
 if [ $1 -gt 1 ] ; then
-  # Upgrade
+  # Upgrade: restore ownership BEFORE restarting service
+  # This prevents permission errors when OLD package's %postun tries to restart
+  if [ -f "/tmp/.salt-minion-upgrade-ownership" ]; then
+      _MN_SAVED=$(cat /tmp/.salt-minion-upgrade-ownership)
+      _MN_LCUR_USER="${_MN_SAVED%%:*}"
+      _MN_LCUR_GROUP="${_MN_SAVED##*:}"
+      echo "Restoring ownership to ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} in %post" >> /var/log/salt-upgrade-debug.log 2>&1
+      rm -f /tmp/.salt-minion-upgrade-ownership
+  else
+      # Fallback if file doesn't exist (shouldn't happen, but be safe)
+      _MN_LCUR_USER="root"
+      _MN_LCUR_GROUP="root"
+      echo "WARNING: Ownership file not found in %post, defaulting to root:root" >> /var/log/salt-upgrade-debug.log 2>&1
+  fi
+
+  # Fix ownership on each path individually, only if it exists
+  for _MN_DIR in /etc/salt/pki/minion /etc/salt/minion.d /var/cache/salt/minion /var/run/salt/minion; do
+      if [ -e "$_MN_DIR" ]; then
+          echo "  chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} $_MN_DIR" >> /var/log/salt-upgrade-debug.log 2>&1
+          chown -R ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} "$_MN_DIR" 2>> /var/log/salt-upgrade-debug.log
+      fi
+  done
+  # Handle log file separately (it's a file, not a directory)
+  if [ -e /var/log/salt/minion ]; then
+      echo "  chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion" >> /var/log/salt-upgrade-debug.log 2>&1
+      chown ${_MN_LCUR_USER}:${_MN_LCUR_GROUP} /var/log/salt/minion 2>> /var/log/salt-upgrade-debug.log
+  fi
+  echo "Ownership restored in %post, now trying to restart service" >> /var/log/salt-upgrade-debug.log 2>&1
+  # Create marker file to tell %posttrans this was an upgrade
+  touch /tmp/.salt-minion-upgrade-ownership.done
+
+  # If upgrading and ownership was non-root, ensure user config is set
+  if [ "$_MN_LCUR_USER" != "root" ] && [ -n "$_MN_LCUR_USER" ]; then
+      # Check if user is already configured
+      _MN_USER_CONFIGURED=0
+      if grep -q "^user:" /etc/salt/minion 2>/dev/null; then
+          _MN_USER_CONFIGURED=1
+      elif [ -d /etc/salt/minion.d ] && grep -q "^user:" /etc/salt/minion.d/*.conf 2>/dev/null; then
+          _MN_USER_CONFIGURED=1
+      fi
+
+      # Only set if not already configured
+      if [ $_MN_USER_CONFIGURED -eq 0 ]; then
+          mkdir -p /etc/salt/minion.d
+          echo "user: ${_MN_LCUR_USER}" > /etc/salt/minion.d/user.conf
+          chmod 644 /etc/salt/minion.d/user.conf
+          echo "Created /etc/salt/minion.d/user.conf with user: ${_MN_LCUR_USER}" >> /var/log/salt-upgrade-debug.log 2>&1
+      fi
+  fi
+
   /bin/systemctl try-restart salt-minion.service >/dev/null 2>&1 || :
 else
   # Initial installation
@@ -624,8 +749,18 @@ if [ ! -e "/var/log/salt/cloud" ]; then
   chmod 640 /var/log/salt/cloud
 fi
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MS_CUR_USER}:%{_MS_CUR_GROUP} /etc/salt/cloud.deploy.d /var/log/salt/cloud /opt/saltstack/salt/lib/python${PY_VER}/site-packages/salt/cloud/deploy
+    # Upgrade: restore ownership from saved file
+    if [ -f "/tmp/.salt-cloud-upgrade-ownership" ]; then
+        _CL_SAVED=$(cat /tmp/.salt-cloud-upgrade-ownership)
+        _MS_LCUR_USER="${_CL_SAVED%%:*}"
+        _MS_LCUR_GROUP="${_CL_SAVED##*:}"
+        rm -f /tmp/.salt-cloud-upgrade-ownership
+    else
+        # Fallback if file doesn't exist
+        _MS_LCUR_USER="%{_SALT_USER}"
+        _MS_LCUR_GROUP="%{_SALT_GROUP}"
+    fi
+    chown -R ${_MS_LCUR_USER}:${_MS_LCUR_GROUP} /etc/salt/cloud.deploy.d /var/log/salt/cloud /opt/saltstack/salt/lib/python${PY_VER}/site-packages/salt/cloud/deploy 2>/dev/null || true
 else
     chown -R %{_SALT_USER}:%{_SALT_GROUP} /etc/salt/cloud.deploy.d /var/log/salt/cloud /opt/saltstack/salt/lib/python${PY_VER}/site-packages/salt/cloud/deploy
 fi
@@ -641,10 +776,53 @@ if [ ! -e "/var/log/salt/key" ]; then
   chmod 640 /var/log/salt/key
 fi
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MS_CUR_USER}:%{_MS_CUR_GROUP} /etc/salt/pki/master /etc/salt/master.d /var/log/salt/master /var/log/salt/key /var/cache/salt/master /var/run/salt/master
+    # Upgrade: restore ownership from saved file
+    if [ -f "/tmp/.salt-master-upgrade-ownership" ]; then
+        _MS_SAVED=$(cat /tmp/.salt-master-upgrade-ownership)
+        _MS_LCUR_USER="${_MS_SAVED%%:*}"
+        _MS_LCUR_GROUP="${_MS_SAVED##*:}"
+        rm -f /tmp/.salt-master-upgrade-ownership
+    else
+        # Fallback if file doesn't exist
+        _MS_LCUR_USER="%{_SALT_USER}"
+        _MS_LCUR_GROUP="%{_SALT_GROUP}"
+    fi
+    chown -R ${_MS_LCUR_USER}:${_MS_LCUR_GROUP} /etc/salt/pki/master /etc/salt/master.d /var/log/salt/master /var/log/salt/key /var/cache/salt/master /var/run/salt/master 2>/dev/null || true
+
+    # If upgrading and ownership was non-root, ensure user config is set
+    if [ "$_MS_LCUR_USER" != "root" ] && [ -n "$_MS_LCUR_USER" ]; then
+        # Check if user is already configured
+        _MS_USER_CONFIGURED=0
+        if grep -q "^user:" /etc/salt/master 2>/dev/null; then
+            _MS_USER_CONFIGURED=1
+        elif [ -d /etc/salt/master.d ] && grep -q "^user:" /etc/salt/master.d/*.conf 2>/dev/null; then
+            _MS_USER_CONFIGURED=1
+        fi
+
+        # Only set if not already configured
+        if [ $_MS_USER_CONFIGURED -eq 0 ]; then
+            mkdir -p /etc/salt/master.d
+            echo "user: ${_MS_LCUR_USER}" > /etc/salt/master.d/user.conf
+            chmod 644 /etc/salt/master.d/user.conf
+        fi
+    fi
 else
     chown -R %{_SALT_USER}:%{_SALT_GROUP} /etc/salt/pki/master /etc/salt/master.d /var/log/salt/master /var/log/salt/key /var/cache/salt/master /var/run/salt/master
+
+    # If %{_SALT_USER} is not root, configure master to run as that user
+    # Check if user is already configured
+    _MS_USER_CONFIGURED=0
+    if grep -q "^user:" /etc/salt/master 2>/dev/null; then
+        _MS_USER_CONFIGURED=1
+    elif [ -d /etc/salt/master.d ] && grep -q "^user:" /etc/salt/master.d/*.conf 2>/dev/null; then
+        _MS_USER_CONFIGURED=1
+    fi
+
+    if [ "%{_SALT_USER}" != "root" ] && [ $_MS_USER_CONFIGURED -eq 0 ]; then
+        mkdir -p /etc/salt/master.d
+        echo "user: %{_SALT_USER}" > /etc/salt/master.d/user.conf
+        chmod 644 /etc/salt/master.d/user.conf
+    fi
 fi
 
 
@@ -654,8 +832,18 @@ if [ ! -e "/var/log/salt/syndic" ]; then
   chmod 640 /var/log/salt/syndic
 fi
 if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MS_CUR_USER}:%{_MS_CUR_GROUP} /var/log/salt/syndic
+    # Upgrade: restore ownership from saved file
+    if [ -f "/tmp/.salt-syndic-upgrade-ownership" ]; then
+        _SY_SAVED=$(cat /tmp/.salt-syndic-upgrade-ownership)
+        _MS_LCUR_USER="${_SY_SAVED%%:*}"
+        _MS_LCUR_GROUP="${_SY_SAVED##*:}"
+        rm -f /tmp/.salt-syndic-upgrade-ownership
+    else
+        # Fallback if file doesn't exist
+        _MS_LCUR_USER="%{_SALT_USER}"
+        _MS_LCUR_GROUP="%{_SALT_GROUP}"
+    fi
+    chown -R ${_MS_LCUR_USER}:${_MS_LCUR_GROUP} /var/log/salt/syndic 2>/dev/null || true
 else
     chown -R %{_SALT_USER}:%{_SALT_GROUP} /var/log/salt/syndic
 fi
@@ -668,12 +856,24 @@ if [ ! -e "/var/log/salt/api" ]; then
 fi
 if [ $1 -gt 1 ] ; then
     # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MS_CUR_USER}:%{_MS_CUR_GROUP} /var/log/salt/api
+    # Detect the current user/group from existing directories
+    if [ -f "/var/log/salt/api" ]; then
+        _MS_LCUR_USER=$(stat -c '%U' /var/log/salt/api 2>/dev/null || echo "%{_SALT_USER}")
+        _MS_LCUR_GROUP=$(stat -c '%G' /var/log/salt/api 2>/dev/null || echo "%{_SALT_GROUP}")
+    else
+        _MS_LCUR_USER="%{_SALT_USER}"
+        _MS_LCUR_GROUP="%{_SALT_GROUP}"
+    fi
+    chown -R ${_MS_LCUR_USER}:${_MS_LCUR_GROUP} /var/log/salt/api 2>/dev/null || true
 else
     chown -R %{_SALT_USER}:%{_SALT_GROUP} /var/log/salt/api
 fi
 
 %posttrans minion
+# Debug: log the parameter to understand upgrade vs fresh install detection
+echo "=== SALT UPGRADE DEBUG: %posttrans minion ===" >> /var/log/salt-upgrade-debug.log 2>&1
+echo "Parameter \$1 = $1" >> /var/log/salt-upgrade-debug.log 2>&1
+
 if [ ! -e "/var/log/salt/minion" ]; then
   touch /var/log/salt/minion
   chmod 640 /var/log/salt/minion
@@ -682,10 +882,39 @@ if [ ! -e "/var/log/salt/key" ]; then
   touch /var/log/salt/key
   chmod 640 /var/log/salt/key
 fi
-if [ $1 -gt 1 ] ; then
-    # Reset permissions to match previous installs - performing upgrade
-    chown -R %{_MN_CUR_USER}:%{_MN_CUR_GROUP} /etc/salt/pki/minion /etc/salt/minion.d /var/log/salt/minion /var/cache/salt/minion /var/run/salt/minion
+
+# Check if /tmp/.salt-minion-upgrade-ownership exists to detect if this was an upgrade
+if [ -f "/tmp/.salt-minion-upgrade-ownership.done" ] || [ $1 -ge 2 ] ; then
+    # This was an upgrade - ownership already restored in %post, just log
+    echo "Detected upgrade (ownership already restored in %post)" >> /var/log/salt-upgrade-debug.log 2>&1
+    echo "Service status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+    rm -f /tmp/.salt-minion-upgrade-ownership.done
+else
+    # Fresh install: check for environment variables to configure ownership
+    echo "Detected fresh install" >> /var/log/salt-upgrade-debug.log 2>&1
+    _MN_INSTALL_USER="${SALT_MINION_USER:-root}"
+    _MN_INSTALL_GROUP="${SALT_MINION_GROUP:-root}"
+
+    # Fix ownership on each path individually, only if it exists
+    for _MN_DIR in /etc/salt/pki/minion /etc/salt/minion.d /var/cache/salt/minion /var/run/salt/minion; do
+        if [ -e "$_MN_DIR" ]; then
+            echo "  Setting ownership on $_MN_DIR to ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP}" >> /var/log/salt-upgrade-debug.log 2>&1
+            chown -R ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP} "$_MN_DIR"
+        fi
+    done
+    # Handle log file separately
+    if [ -e /var/log/salt/minion ]; then
+        chown ${_MN_INSTALL_USER}:${_MN_INSTALL_GROUP} /var/log/salt/minion
+    fi
+
+    # If SALT_MINION_USER is set and not root, configure minion to run as that user
+    if [ -n "$SALT_MINION_USER" ] && [ "$SALT_MINION_USER" != "root" ]; then
+        mkdir -p /etc/salt/minion.d
+        echo "user: ${SALT_MINION_USER}" > /etc/salt/minion.d/user.conf
+        chmod 644 /etc/salt/minion.d/user.conf
+    fi
 fi
+echo "=== SALT UPGRADE DEBUG: %posttrans minion complete ===" >> /var/log/salt-upgrade-debug.log 2>&1
 
 
 %preun
@@ -725,13 +954,18 @@ if [ $1 -ge 1 ] ; then
 fi
 
 %postun minion
+# Debug logging
+echo "=== SALT UPGRADE DEBUG: %postun minion (NEW package) starting ===" >> /var/log/salt-upgrade-debug.log 2>&1
+echo "Timestamp: $(date)" >> /var/log/salt-upgrade-debug.log 2>&1
+echo "Parameter \$1 = $1 (0=uninstall, 1=upgrade)" >> /var/log/salt-upgrade-debug.log 2>&1
+echo "Service status: $(/bin/systemctl is-active salt-minion.service 2>&1)" >> /var/log/salt-upgrade-debug.log 2>&1
+
 # %%systemd_postun_with_restart salt-minion.service
 /bin/systemctl daemon-reload >/dev/null 2>&1 || :
-if [ $1 -ge 1 ] ; then
-  # Package upgrade, not uninstall
-  /bin/systemctl try-restart salt-minion.service >/dev/null 2>&1 || :
-fi
+# Note: We do NOT restart here during upgrade because ownership hasn't been restored yet.
+# The restart happens in %posttrans after ownership is fixed.
 if [ $1 -eq 0 ]; then
+  echo "This is an uninstall, cleaning up FIPS files" >> /var/log/salt-upgrade-debug.log 2>&1
   if [ $(cat /etc/os-release | grep VERSION_ID | cut -d '=' -f 2 | sed  's/\"//g' | cut -d '.' -f 1) = "8" ]; then
     if [ -z "$(rpm -qi salt-master | grep Name | grep salt-master)" ]; then
       # uninstall and no master running
@@ -743,7 +977,10 @@ if [ $1 -eq 0 ]; then
       fi
     fi
   fi
+else
+  echo "This is an upgrade, NOT restarting service here (will be done in %posttrans)" >> /var/log/salt-upgrade-debug.log 2>&1
 fi
+echo "=== SALT UPGRADE DEBUG: %postun minion (NEW package) complete ===" >> /var/log/salt-upgrade-debug.log 2>&1
 
 %postun api
 # %%systemd_postun_with_restart salt-api.service

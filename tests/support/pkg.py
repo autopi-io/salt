@@ -85,6 +85,7 @@ class SaltPkgInstall:
     file_ext: bool = attr.ib(default=None)
     relenv: bool = attr.ib(default=True)
     installer_timeout: int = attr.ib(default=attr.NOTHING)
+    install_env: dict = attr.ib(factory=dict)
 
     @proc.default
     def _default_proc(self):
@@ -556,6 +557,12 @@ class SaltPkgInstall:
                 env=env,
             )
         else:
+            # Fresh install path
+            env = os.environ.copy()
+            # Add any custom install environment variables
+            if self.install_env:
+                env.update(self.install_env)
+
             args = ["install", "-y"]
             if self.distro_id == "photon":
                 ret = self.proc.run(
@@ -569,7 +576,7 @@ class SaltPkgInstall:
                     args.append("--nogpgcheck")
             log.info("Installing packages:\n%s", pprint.pformat(self.pkgs))
             args += self.pkgs
-            ret = self.proc.run(self.pkg_mngr, *args)
+            ret = self.proc.run(self.pkg_mngr, *args, env=env)
 
         if not platform.is_darwin() and not platform.is_windows():
             # Make sure we don't have any trailing references to old package file locations

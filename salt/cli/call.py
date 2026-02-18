@@ -3,6 +3,7 @@ import os
 import salt.cli.caller
 import salt.defaults.exitcodes
 import salt.utils.parsers
+import salt.utils.verify
 from salt.config import _expand_glob_path
 
 
@@ -36,6 +37,26 @@ class SaltCall(salt.utils.parsers.SaltCallOptionParser):
             self.config["file_client"] = "local"
         if self.options.master:
             self.config["master"] = self.options.master
+
+        if self.options.user:
+            self.config["user"] = self.options.user
+
+        # Drop privileges BEFORE verify_env to ensure directories are created with correct ownership
+        if self.config["user"] != salt.utils.user.get_user():
+            if not salt.utils.verify.check_user(self.config["user"]):
+                self.exit(salt.defaults.exitcodes.EX_NOUSER)
+
+        if self.config["verify_env"]:
+            salt.utils.verify.verify_env(
+                [
+                    self.config["pki_dir"],
+                    self.config["cachedir"],
+                    self.config["extension_modules"],
+                ],
+                self.config["user"],
+                permissive=self.config["permissive_pki_access"],
+                pki_dir=self.config["pki_dir"],
+            )
 
         caller = salt.cli.caller.Caller.factory(self.config)
 

@@ -1,0 +1,276 @@
+import logging
+import time
+
+import packaging.version
+import pytest
+
+pytestmark = [
+    pytest.mark.skip_unless_on_linux(reason="Only supported on Linux family"),
+]
+
+log = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def salt_install_env(request):
+    """
+    Override the default install environment.
+
+    For upgrade tests: Return empty dict because older versions (like 3006.20)
+    don't support SALT_MINION_USER/GROUP. The test will manually set up ownership
+    to simulate a system that was configured with a non-root user.
+
+    For fresh install tests: Set SALT_MINION_USER=salt to test the new installation
+    behavior with environment variables.
+    """
+    # Check if --upgrade flag is present in the test config
+    upgrade = request.config.getoption("--upgrade", default=False)
+
+    if upgrade:
+        # Upgrade test: don't use env vars for old version installation
+        return {}
+    else:
+        # Fresh install test: use env vars to test new installation behavior
+        return {
+            "SALT_MINION_USER": "salt",
+            "SALT_MINION_GROUP": "salt",
+        }
+
+
+def test_salt_user_ownership_preserved_on_upgrade(
+    call_cli, install_salt_systemd, salt_systemd_setup
+):
+    """
+    Test that salt user ownership is preserved during upgrade when no env vars are set.
+
+    This test verifies:
+    1. Fresh install with SALT_MINION_USER=salt creates salt:salt ownership
+    2. Upgrade WITHOUT environment variables preserves the salt:salt ownership
+    3. The RPM %posttrans scriptlet correctly detects and preserves existing ownership
+
+    Test flow:
+    - Initial install happens with SALT_MINION_USER=salt (via salt_install_env fixture)
+    - Verify directories are owned by salt:salt
+    - Upgrade to new version WITHOUT setting any environment variables
+    - Verify directories are still owned by salt:salt (ownership preserved)
+    """
+    # Skip if this is not an upgrade test
+    if not install_salt_systemd.upgrade:
+        pytest.skip("This test requires upgrade testing, run with --upgrade")
+
+    upgrade_version = packaging.version.parse(install_salt_systemd.artifact_version)
+
+    # Verify we have a previous version installed
+    ret = call_cli.run("--local", "test.version")
+    assert ret.returncode == 0
+    installed_version = packaging.version.parse(ret.data)
+
+    # If we're already at or above the upgrade version, install previous version first
+    if installed_version >= upgrade_version:
+        log.info("Installing previous version before testing upgrade")
+        install_salt_systemd.install_previous(downgrade=True)
+        ret = call_cli.run("--local", "test.version")
+        assert ret.returncode == 0
+        installed_version = packaging.version.parse(ret.data)
+        assert installed_version < upgrade_version
+
+    log.info("Testing upgrade from %s to %s", installed_version, upgrade_version)
+
+    # The previous version doesn't support SALT_MINION_USER environment variable,
+    # so we need to manually set up salt:salt ownership AND user configuration
+    # to simulate a system that was installed with salt user configuration.
+
+    # First, ensure salt user exists
+    ret = call_cli.run("--local", "user.info", "salt")
+    if ret.returncode != 0 or not ret.data:
+        log.info("Creating salt user for testing")
+        ret = call_cli.run("--local", "user.add", "salt", system=True, createhome=False)
+        assert ret.returncode == 0
+
+    # Check if the current salt-call version supports --priv option
+    # The --priv option was added in later versions, but 3006.20 doesn't support it
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
+    # Define the minion directories
+    minion_dirs = [
+        "/etc/salt/pki/minion",
+        "/var/cache/salt/minion",
+        "/var/log/salt",
+        "/var/run/salt/minion",
+    ]
+
+    # Change ownership to salt:salt BEFORE configuring minion to run as salt user
+    # This simulates a system where an admin manually configured salt to run as non-root
+    log.info("Changing ownership to salt:salt (simulating manual configuration)")
+    for dir_path in minion_dirs:
+        if supports_priv:
+            ret = call_cli.run(
+                "--local", "--priv=root", "cmd.run", f"chown -R salt:salt {dir_path}"
+            )
+        else:
+            ret = call_cli.run("--local", "cmd.run", f"chown -R salt:salt {dir_path}")
+        if ret.returncode != 0:
+            log.warning("Failed to chown %s, directory may not exist yet", dir_path)
+
+    # Configure minion to run as salt user
+    log.info("Configuring minion to run as salt user")
+    ret = call_cli.run(
+        "--local",
+        "cmd.run",
+        "mkdir -p /etc/salt/minion.d && echo 'user: salt' > /etc/salt/minion.d/user.conf",
+    )
+    assert ret.returncode == 0
+
+    # Restart minion to apply the user configuration
+    # Now the minion can successfully start as salt user and read salt:salt keys
+    log.info("Restarting minion to apply user configuration")
+    if supports_priv:
+        ret = call_cli.run(
+            "--local", "--priv=root", "cmd.run", "systemctl restart salt-minion"
+        )
+    else:
+        ret = call_cli.run("--local", "cmd.run", "systemctl restart salt-minion")
+    assert ret.returncode == 0
+    time.sleep(5)  # Wait for minion to restart
+
+    log.info("Verifying pre-upgrade ownership is salt:salt")
+    for dir_path in minion_dirs:
+        test_cmd = f"ls -ld {dir_path}"
+        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        if ret.returncode != 0:
+            log.warning("Directory %s does not exist, skipping", dir_path)
+            continue
+
+        # Use ret.data instead of ret.stdout to get the actual command output
+        # ls -ld output format: perms links user group size date time name
+        parts = ret.data.strip().split()
+        test_user = parts[2]
+        test_group = parts[3]
+
+        assert (
+            test_user == "salt"
+        ), f"Before upgrade: Expected {dir_path} owned by salt, got {test_user}. Full output: {ret.data}"
+        assert (
+            test_group == "salt"
+        ), f"Before upgrade: Expected {dir_path} group salt, got {test_group}. Full output: {ret.data}"
+
+    # Stop the minion before upgrade to avoid permission conflicts during file replacement
+    # When minion runs as non-root user, the upgrade temporarily installs files as root,
+    # which can cause permission denied errors if minion tries to access them during upgrade
+    log.info("Stopping minion before upgrade")
+    if supports_priv:
+        ret = call_cli.run(
+            "--local", "--priv=root", "cmd.run", "systemctl stop salt-minion"
+        )
+    else:
+        ret = call_cli.run("--local", "cmd.run", "systemctl stop salt-minion")
+    assert ret.returncode == 0
+    time.sleep(2)  # Wait for minion to fully stop
+
+    # Now upgrade WITHOUT setting environment variables
+    # The RPM %posttrans scriptlet should detect existing ownership and preserve it
+    log.info("Upgrading to version %s WITHOUT environment variables", upgrade_version)
+    install_salt_systemd.install(upgrade=True)
+    time.sleep(10)  # Allow time for services to restart
+
+    # Recheck for --priv support after upgrade (new version should support it)
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
+    # Capture the debug log created by RPM scriptlets
+    log.info("Capturing RPM upgrade debug log")
+    if supports_priv:
+        ret = call_cli.run(
+            "--local", "--priv=root", "cmd.run", "cat /var/log/salt-upgrade-debug.log"
+        )
+    else:
+        ret = call_cli.run("--local", "cmd.run", "cat /var/log/salt-upgrade-debug.log")
+    if ret.returncode == 0:
+        log.info("=== RPM UPGRADE DEBUG LOG START ===")
+        log.info(ret.data)
+        log.info("=== RPM UPGRADE DEBUG LOG END ===")
+    else:
+        log.warning("Could not read /var/log/salt-upgrade-debug.log: %s", ret.data)
+
+    # Verify we upgraded successfully
+    if supports_priv:
+        ret = call_cli.run("--local", "--priv=root", "test.version")
+    else:
+        ret = call_cli.run("--local", "test.version")
+    assert ret.returncode == 0
+    installed_version = packaging.version.parse(ret.data)
+    assert (
+        installed_version == upgrade_version
+    ), f"Expected version {upgrade_version}, got {installed_version}"
+
+    # Verify that ownership is STILL salt:salt (preserved during upgrade)
+    log.info("Verifying post-upgrade ownership is still salt:salt")
+    for dir_path in minion_dirs:
+        test_cmd = f"ls -ld {dir_path}"
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
+        if ret.returncode != 0:
+            log.warning("Directory %s does not exist, skipping", dir_path)
+            continue
+
+        # Use ret.data instead of ret.stdout to get the actual command output
+        parts = ret.data.strip().split()
+        test_user = parts[2]
+        test_group = parts[3]
+
+        assert (
+            test_user == "salt"
+        ), f"After upgrade: Expected {dir_path} owned by salt, got {test_user}. Ownership was not preserved! Full output: {ret.data}"
+        assert (
+            test_group == "salt"
+        ), f"After upgrade: Expected {dir_path} group salt, got {test_group}. Ownership was not preserved! Full output: {ret.data}"
+
+    log.info("SUCCESS: salt:salt ownership was preserved during upgrade")
+
+    # Now verify that running salt-call and salt-pip as root still preserves salt user ownership
+    # Both commands should drop privileges to the configured user and not create root-owned files
+    log.info("Testing that salt-call run as root preserves salt:salt ownership")
+
+    # Run a salt-call command that will access cache
+    if supports_priv:
+        ret = call_cli.run("--local", "--priv=root", "test.ping")
+    else:
+        ret = call_cli.run("--local", "test.ping")
+    assert ret.returncode == 0
+
+    # Run salt-pip directly to install a package into the 'extras' directory
+    # This verifies that salt-pip drops privileges and creates files owned by salt:salt
+    log.info("Installing package via salt-pip to test extras directory ownership")
+    if supports_priv:
+        ret = call_cli.run(
+            "--local", "--priv=root", "cmd.run", "salt-pip install cowsay"
+        )
+    else:
+        ret = call_cli.run("--local", "cmd.run", "salt-pip install cowsay")
+    assert ret.returncode == 0
+
+    # Now verify NO files in the cache directories are owned by root
+    log.info("Verifying no root-owned files were created in salt user directories")
+    for dir_path in minion_dirs:
+        # Find all files in the directory and check ownership
+        test_cmd = f"find {dir_path} -type f -uid 0 2>/dev/null || true"
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
+
+        if ret.stdout.strip():
+            # Found root-owned files!
+            root_owned_files = ret.stdout.strip().split("\n")
+            pytest.fail(
+                f"Found root-owned files in {dir_path} after running salt-call/salt-pip:\n"
+                + "\n".join(root_owned_files[:10])  # Show first 10 files
+                + f"\n... ({len(root_owned_files)} total root-owned files)"
+            )
+
+    log.info(
+        "SUCCESS: No root-owned files created, salt-call and salt-pip properly dropped privileges"
+    )

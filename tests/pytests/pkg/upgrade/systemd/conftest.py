@@ -24,7 +24,27 @@ log = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def install_salt_systemd(request, salt_factories_root_dir):
+def salt_install_env(request):
+    """
+    Fixture to provide custom environment variables for package installation.
+
+    Tests can override this fixture to provide custom environment variables
+    that will be passed to the package manager during installation.
+
+    Example:
+        @pytest.fixture
+        def salt_install_env():
+            return {"SALT_MINION_USER": "salt", "SALT_MINION_GROUP": "salt"}
+    """
+    # Check if the test has a custom salt_install_env marker
+    marker = request.node.get_closest_marker("salt_install_env")
+    if marker:
+        return marker.kwargs
+    return {}
+
+
+@pytest.fixture
+def install_salt_systemd(request, salt_factories_root_dir, salt_install_env):
     if platform.is_windows():
         conf_dir = "c:/salt/etc/salt"
     else:
@@ -38,6 +58,7 @@ def install_salt_systemd(request, salt_factories_root_dir):
         no_install=request.config.getoption("--no-install"),
         prev_version=request.config.getoption("--prev-version"),
         use_prev_version=request.config.getoption("--use-prev-version"),
+        install_env=salt_install_env,
     ) as fixture:
         # XXX Force un-install for now
         fixture.no_uninstall = False
@@ -195,24 +216,35 @@ def master_systemd(salt_factories_systemd, install_salt_systemd, pkg_tests_accou
         # which sets root perms on /etc/salt/pki/master since we are running
         # the test suite as root, but we want to run Salt master as salt
         # We ensure those permissions where set by the package earlier
-        subprocess.run(
-            [
-                "chown",
-                "-R",
-                "salt:salt",
-                str(pathlib.Path("/etc", "salt", "pki", "master")),
-            ],
-            check=True,
-        )
 
+        # Check if salt user exists before chowning (similar to minion_systemd fixture)
         if not platform.is_windows() and not platform.is_darwin():
-            # The engines_dirs is created in .nox path. We need to set correct perms
-            # for the user running the Salt Master
-            check_paths = [state_tree, pillar_tree, CODE_DIR / ".nox"]
-            for path in check_paths:
-                if os.path.exists(path) is False:
-                    continue
-                subprocess.run(["chown", "-R", "salt:salt", str(path)], check=False)
+            import pwd
+
+            try:
+                pwd.getpwnam("salt")
+            except KeyError:
+                # The salt user does not exist, skip chown
+                log.warning("salt user does not exist, skipping chown")
+                pass
+            else:
+                subprocess.run(
+                    [
+                        "chown",
+                        "-R",
+                        "salt:salt",
+                        str(pathlib.Path("/etc", "salt", "pki", "master")),
+                    ],
+                    check=True,
+                )
+
+                # The engines_dirs is created in .nox path. We need to set correct perms
+                # for the user running the Salt Master
+                check_paths = [state_tree, pillar_tree, CODE_DIR / ".nox"]
+                for path in check_paths:
+                    if os.path.exists(path) is False:
+                        continue
+                    subprocess.run(["chown", "-R", "salt:salt", str(path)], check=False)
 
     with factory.started(start_timeout=start_timeout):
         yield factory
@@ -383,16 +415,31 @@ def salt_systemd_setup(
     # Run tests
     yield
 
+    # Check if the current salt-call version supports --priv option
+    # The --priv option was added to maintain root privileges for administrative tasks,
+    # but older salt versions don't support this option.
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
     # Verify that the new version is installed after the test
-    ret = call_cli.run("--local", "test.version")
+    # Use --priv=root if supported to handle case where test modified user config
+    if supports_priv:
+        ret = call_cli.run("--local", "--priv=root", "test.version")
+    else:
+        ret = call_cli.run("--local", "test.version")
     assert ret.returncode == 0
     installed_minion_version = packaging.version.parse(ret.data)
     assert installed_minion_version == upgrade_version
 
     # Reset systemd services to their preset states
+    # Use --priv=root for administrative tasks if the version supports it.
+    # This maintains root privileges even if a test modified the user config.
     for test_item in test_list:
         test_cmd = f"systemctl preset {test_item}"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
         assert ret.returncode == 0
 
     # Install previous version, downgrading if necessary
@@ -421,16 +468,33 @@ def salt_systemd_mask_services(call_cli):
     This is required to test the preservation of masked state during upgrades.
     """
 
+    # Check if the current salt-call version supports --priv option
+    # The --priv option was added to prevent privilege dropping in certain scenarios,
+    # but older salt versions don't support it.
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
     test_list = ["salt-api", "salt-minion", "salt-master"]
     for test_item in test_list:
         test_cmd = f"systemctl mask {test_item}"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        # Use --priv=root to maintain root privileges for administrative systemctl operations
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
         assert ret.returncode == 0
 
     yield
 
     # Cleanup: unmask the services after the test
+    # Check again in case upgrade happened during the test
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
     for test_item in test_list:
         test_cmd = f"systemctl unmask {test_item}"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
         assert ret.returncode == 0

@@ -67,11 +67,20 @@ def test_salt_ownership_permission(call_cli, install_salt_systemd, salt_systemd_
     test_string = f"\nuser: {test_minion_user}\n"
     ret = call_cli.run("--local", "file.append", "/etc/salt/minion", test_string)
 
+    # Check if the current salt-call version supports --priv option
+    # We do this before the upgrade since we're still on the old version
+    help_ret = call_cli.run("--help")
+    supports_priv = "--priv" in help_ret.stdout
+
     # restart and check ownership is correct
+    # Use --priv=root if supported, otherwise run without it
     test_list = ["salt-api", "salt-minion", "salt-master"]
     for test_item in test_list:
         test_cmd = f"systemctl restart {test_item}"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
 
     time.sleep(10)  # allow some time for restart
 
@@ -79,7 +88,10 @@ def test_salt_ownership_permission(call_cli, install_salt_systemd, salt_systemd_
     test_list = ["salt-api", "salt-minion", "salt-master"]
     for test_item in test_list:
         test_cmd = f"ls -dl /run/{test_item}.pid"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        if supports_priv:
+            ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
+        else:
+            ret = call_cli.run("--local", "cmd.run", test_cmd)
         assert ret.returncode == 0
 
         test_user = ret.stdout.strip().split()[4]
@@ -101,7 +113,7 @@ def test_salt_ownership_permission(call_cli, install_salt_systemd, salt_systemd_
     test_list = ["salt-api", "salt-minion", "salt-master"]
     for test_item in test_list:
         test_cmd = f"ls -dl /run/{test_item}.pid"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
         assert ret.returncode == 0
 
         test_user = ret.stdout.strip().split()[4]
@@ -115,22 +127,31 @@ def test_salt_ownership_permission(call_cli, install_salt_systemd, salt_systemd_
             assert test_group == f"{test_master_user}"
 
     # restore to defaults to ensure further tests run fine
-    ret = call_cli.run("--local", "file.comment_line", "/etc/salt/master", "^user:")
+    # Use --priv=root to maintain root privileges for administrative tasks
+    ret = call_cli.run(
+        "--local", "--priv=root", "file.comment_line", "/etc/salt/master", "^user:"
+    )
     assert ret.returncode == 0
 
-    ret = call_cli.run("--local", "file.comment_line", "/etc/salt/minion", "^user:")
+    ret = call_cli.run(
+        "--local", "--priv=root", "file.comment_line", "/etc/salt/minion", "^user:"
+    )
     assert ret.returncode == 0
 
     test_string = "\nuser: salt\n"
-    ret = call_cli.run("--local", "file.append", "/etc/salt/master", test_string)
+    ret = call_cli.run(
+        "--local", "--priv=root", "file.append", "/etc/salt/master", test_string
+    )
 
     test_string = "\nuser: root\n"
-    ret = call_cli.run("--local", "file.append", "/etc/salt/minion", test_string)
+    ret = call_cli.run(
+        "--local", "--priv=root", "file.append", "/etc/salt/minion", test_string
+    )
 
     # restart and check ownership is correct
     test_list = ["salt-api", "salt-minion", "salt-master"]
     for test_item in test_list:
         test_cmd = f"systemctl restart {test_item}"
-        ret = call_cli.run("--local", "cmd.run", test_cmd)
+        ret = call_cli.run("--local", "--priv=root", "cmd.run", test_cmd)
 
     time.sleep(10)  # allow some time for restart
