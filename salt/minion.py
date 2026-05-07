@@ -3438,6 +3438,8 @@ class Minion(MinionBase):
             self.environ_setenv(tag, data)
         elif tag.startswith("_minion_mine"):
             self._mine_send(tag, data)
+        elif tag.startswith("minion_job"):
+            yield _minion._handle_decoded_payload(data)
         elif tag.startswith("fire_master"):
             if self.connected:
                 log.debug(
