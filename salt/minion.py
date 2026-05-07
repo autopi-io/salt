@@ -130,6 +130,33 @@ def resolve_dns(opts, fallback=True):
         check_dns = False
     import salt.utils.network
 
+    cache_fn = os.path.join(opts["cachedir"], "last_master_ip")
+
+    def _read_cached_master_ip(cache_path):
+        if not os.path.isfile(cache_path):
+            return None
+
+        try:
+            with salt.utils.files.fopen(cache_path, "r") as fp_:
+                cached_master_ip = fp_.read().strip()
+        except (OSError, UnicodeDecodeError):
+            log.exception("Unable to read master IP from cache file %s", cache_path)
+            return None
+
+        if not cached_master_ip:
+            return None
+
+        try:
+            return salt.utils.network.ip_bracket(cached_master_ip)
+        except ValueError:
+            log.warning(
+                "Ignoring invalid cached master IP %s from %s",
+                cached_master_ip,
+                cache_path,
+            )
+            return None
+
+    resolved_via_dns = False
     if check_dns is True:
         try:
             if opts["master"] == "":
@@ -137,12 +164,22 @@ def resolve_dns(opts, fallback=True):
             ret["master_ip"] = salt.utils.network.dns_check(
                 opts["master"], int(opts["master_port"]), True, opts["ipv6"]
             )
+            resolved_via_dns = True
         except SaltClientError:
             retry_dns_count = opts.get("retry_dns_count", None)
             if opts["retry_dns"]:
                 while True:
                     if retry_dns_count is not None:
                         if retry_dns_count == 0:
+                            cached_master_ip = _read_cached_master_ip(cache_fn)
+                            if cached_master_ip is not None:
+                                ret["master_ip"] = cached_master_ip
+                                log.info(
+                                    "Read master IP %s from cache file %s",
+                                    ret["master_ip"],
+                                    cache_fn,
+                                )
+                                break
                             raise SaltMasterUnresolvableError
                         retry_dns_count -= 1
                     log.error(
@@ -156,9 +193,18 @@ def resolve_dns(opts, fallback=True):
                         ret["master_ip"] = salt.utils.network.dns_check(
                             opts["master"], int(opts["master_port"]), True, opts["ipv6"]
                         )
+                        resolved_via_dns = True
                         break
                     except SaltClientError:
-                        pass
+                        cached_master_ip = _read_cached_master_ip(cache_fn)
+                        if cached_master_ip is not None:
+                            ret["master_ip"] = cached_master_ip
+                            log.info(
+                                "Read master IP %s from cache file %s",
+                                ret["master_ip"],
+                                cache_fn,
+                            )
+                            break
             else:
                 if fallback:
                     ret["master_ip"] = "127.0.0.1"
@@ -194,6 +240,18 @@ def resolve_dns(opts, fallback=True):
                 opts["master_ip"],
                 ret["master_ip"],
             )
+
+    if resolved_via_dns and "master_ip" in ret:
+        try:
+            with salt.utils.files.flopen(cache_fn, "w") as fp_:
+                fp_.write(ret["master_ip"])
+        except OSError:
+            log.exception(
+                "Unable to write master IP %s to cache file %s",
+                ret["master_ip"],
+                cache_fn,
+            )
+
     if opts["source_interface_name"]:
         log.trace("Custom source interface required: %s", opts["source_interface_name"])
         interfaces = salt.utils.network.interfaces()

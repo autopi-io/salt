@@ -802,6 +802,73 @@ def test_minion_retry_dns_count(minion_opts):
         salt.minion.resolve_dns(minion_opts)
 
 
+def test_minion_resolve_dns_uses_cached_master_ip(minion_opts, tmp_path):
+    cache_path = tmp_path / "last_master_ip"
+    cache_path.write_text("192.0.2.10", encoding="utf-8")
+
+    minion_opts.update(
+        {
+            "cachedir": str(tmp_path),
+            "ipv6": False,
+            "master": "dummy",
+            "master_port": "4555",
+            "retry_dns": 1,
+            "retry_dns_count": 1,
+        }
+    )
+
+    with patch(
+        "salt.utils.network.dns_check", side_effect=SaltClientError()
+    ), patch("time.sleep", MagicMock()):
+        assert salt.minion.resolve_dns(minion_opts) == {
+            "master_ip": "192.0.2.10",
+            "master_uri": "tcp://192.0.2.10:4555",
+        }
+
+
+def test_minion_resolve_dns_writes_cached_master_ip(minion_opts, tmp_path):
+    minion_opts.update(
+        {
+            "cachedir": str(tmp_path),
+            "ipv6": False,
+            "master": "dummy",
+            "master_port": "4555",
+            "retry_dns": 1,
+            "retry_dns_count": 1,
+        }
+    )
+
+    with patch("salt.utils.network.dns_check", MagicMock(return_value="192.0.2.20")):
+        assert salt.minion.resolve_dns(minion_opts) == {
+            "master_ip": "192.0.2.20",
+            "master_uri": "tcp://192.0.2.20:4555",
+        }
+
+    assert (tmp_path / "last_master_ip").read_text(encoding="utf-8") == "192.0.2.20"
+
+
+def test_minion_resolve_dns_ignores_invalid_cached_master_ip(minion_opts, tmp_path):
+    cache_path = tmp_path / "last_master_ip"
+    cache_path.write_text("not-an-ip", encoding="utf-8")
+
+    minion_opts.update(
+        {
+            "cachedir": str(tmp_path),
+            "ipv6": False,
+            "master": "dummy",
+            "master_port": "4555",
+            "retry_dns": 1,
+            "retry_dns_count": 1,
+        }
+    )
+
+    with patch(
+        "salt.utils.network.dns_check", side_effect=SaltClientError()
+    ), patch("time.sleep", MagicMock()):
+        with pytest.raises(SaltMasterUnresolvableError):
+            salt.minion.resolve_dns(minion_opts)
+
+
 @pytest.mark.slow_test
 def test_gen_modules_executors(minion_opts):
     """
