@@ -198,7 +198,7 @@ class Schedule:
         return self.opts.get(opt, {})
 
     def _get_schedule(
-        self, include_opts=True, include_pillar=True, remove_hidden=False
+        self, include_opts=True, include_pillar=True, remove_hidden=False, include_transient=True
     ):
         """
         Return the schedule data structure
@@ -214,6 +214,10 @@ class Schedule:
             if not isinstance(opts_schedule, dict):
                 raise ValueError("Schedule must be of type dict.")
             schedule.update(opts_schedule)
+
+        if not include_transient:
+            schedule = {name: data for name, data in schedule.items()
+                if not data.get('metadata', {}).get('transient', False)}
 
         if remove_hidden:
             _schedule = copy.deepcopy(schedule)
@@ -301,7 +305,7 @@ class Schedule:
 
         schedule_conf = os.path.join(minion_d_dir, "_schedule.conf")
         log.debug("Persisting schedule")
-        schedule_data = self._get_schedule(include_pillar=False, remove_hidden=True)
+        schedule_data = self._get_schedule(include_pillar=False, remove_hidden=True, include_transient=False)
         try:
             with salt.utils.files.fopen(schedule_conf, "wb+") as fp_:
                 fp_.write(

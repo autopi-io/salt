@@ -18,7 +18,7 @@ import salt.transport.tcp
 import salt.transport.ws
 import salt.transport.zeromq
 import salt.utils.stringutils
-from tests.support.mock import MagicMock, patch
+from tests.support.mock import AsyncMock, MagicMock, patch
 
 log = logging.getLogger(__name__)
 
@@ -168,6 +168,45 @@ def test_zeromq_async_pub_channel_filtering_decode_message(
             res = transport._decode_messages(message)
 
     assert res["enc"] == "aes"
+
+
+async def test_zeromq_async_pub_channel_filtering_recv_uses_multipart(
+    temp_salt_master,
+):
+    """
+    test zeromq PublishClient recv when zmq_filtering enabled
+    """
+    opts = dict(
+        temp_salt_master.config.copy(),
+        ipc_mode="ipc",
+        pub_hwm=0,
+        zmq_filtering=True,
+        recon_randomize=False,
+        recon_default=1,
+        recon_max=2,
+        master_ip="127.0.0.1",
+        acceptance_wait_time=5,
+        acceptance_wait_time_max=5,
+        sign_pub_messages=False,
+    )
+    opts["master_uri"] = "tcp://{interface}:{publish_port}".format(**opts)
+
+    ioloop = tornado.ioloop.IOLoop()
+    transport = salt.transport.zeromq.PublishClient(
+        opts, ioloop, host=opts["master_ip"], port=121212
+    )
+    with transport:
+        transport._socket = MagicMock()
+        transport._socket.recv = AsyncMock(return_value=b"unused")
+        transport._socket.recv_multipart = AsyncMock(
+            return_value=[b"broadcast", b"payload"]
+        )
+
+        res = await transport.recv()
+
+    assert res == [b"broadcast", b"payload"]
+    transport._socket.recv_multipart.assert_awaited_once()
+    transport._socket.recv.assert_not_called()
 
 
 async def test_publish_client_connect_server_down(transport, io_loop):

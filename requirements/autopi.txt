@@ -1,0 +1,2 @@
+-r zeromq.txt
+--no-binary=pyyaml

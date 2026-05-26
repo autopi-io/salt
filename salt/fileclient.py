@@ -626,6 +626,7 @@ class Client:
             except Exception:  # pylint: disable=broad-except
                 raise MinionError(f"Could not fetch from {url}")
 
+        header_dict = {}  # HN: Moved up here because we need it for 'https+token'
         get_kwargs = {}
         if url_data.username is not None and url_data.scheme in ("http", "https"):
             netloc = url_data.netloc
@@ -643,6 +644,28 @@ class Client:
                 )
             )
             get_kwargs["auth"] = (url_data.username, url_data.password)
+        # HN: Also support token authorization using header
+        elif url_data.username is not None and url_data.scheme.startswith("https+"):
+            netloc = url_data.netloc
+            at_sign_pos = netloc.rfind("@")
+            if at_sign_pos != -1:
+                 netloc = netloc[at_sign_pos + 1:]
+            plus_sign_pos = url_data.scheme.rfind("+")
+            scheme = url_data.scheme[:plus_sign_pos]
+            auth_prefix = url_data.scheme[plus_sign_pos + 1:]
+            fixed_url = urllib.parse.urlunparse(
+                (
+                    scheme,
+                    netloc,
+                    url_data.path,
+                    url_data.params,
+                    url_data.query,
+                    url_data.fragment
+                )
+            )
+            header_dict["authorization"] = "{:} {:}".format(auth_prefix, url_data.username)
+            # HN: We need to clear username from url data so we parse fixed url
+            url_data = urllib.parse.urlparse(fixed_url)
         else:
             fixed_url = url
 
@@ -776,7 +799,6 @@ class Client:
 
             # ETag is only used for refetch. Cached file and previous ETag
             # should be present for verification.
-            header_dict = {}
             if use_etag and os.path.exists(dest_etag) and os.path.exists(dest):
                 with salt.utils.files.fopen(dest_etag, "r") as etagfp:
                     etag = etagfp.read().replace("\n", "").strip()

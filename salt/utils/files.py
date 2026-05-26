@@ -97,7 +97,7 @@ else:
 log = logging.getLogger(__name__)
 
 LOCAL_PROTOS = ("", "file")
-REMOTE_PROTOS = ("http", "https", "ftp", "swift", "s3")
+REMOTE_PROTOS = ("http", "https", "https+token", "https+bearer", "ftp", "swift", "s3")
 VALID_PROTOS = ("salt", "file") + REMOTE_PROTOS
 TEMPFILE_PREFIX = "__salt.tmp."
 

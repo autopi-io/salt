@@ -328,17 +328,22 @@ class PublishClient(salt.transport.base.PublishClient):
         return payload
 
     async def recv(self, timeout=None):
+        recv_func = (
+            self._socket.recv_multipart
+            if self.opts.get("zmq_filtering", False)
+            else self._socket.recv
+        )
         if timeout == 0:
             events = self.poller.poll(timeout=timeout)
             if events:
-                return await self._socket.recv()
+                return await recv_func()
         elif timeout:
             try:
-                return await asyncio.wait_for(self._socket.recv(), timeout=timeout)
+                return await asyncio.wait_for(recv_func(), timeout=timeout)
             except asyncio.exceptions.TimeoutError:
                 log.trace("PublishClient recieve timedout: %d", timeout)
         else:
-            return await self._socket.recv()
+            return await recv_func()
 
     async def send(self, msg):
         return
