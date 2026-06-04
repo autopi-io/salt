@@ -1496,7 +1496,7 @@ def login(*registries):
         except KeyError as exc:
             errors.append(f"Missing {exc} for registry '{registry}'")
         else:
-            cmd = ["docker", "login", "-u", username, "-p", password]
+            cmd = [__opts__.get('docker.exec', 'balena-engine'), "login", "-u", username, "-p", password]
             if registry.lower() != "hub":
                 cmd.append(registry)
             log.debug(
@@ -1583,7 +1583,7 @@ def logout(*registries):
             errors.append(f"No match found for registry '{registry}'")
             continue
         else:
-            cmd = ["docker", "logout"]
+            cmd = [__opts__.get('docker.exec', 'balena-engine'), "logout"]
             if registry.lower() != "hub":
                 cmd.append(registry)
             log.debug("Attempting to logout of docker registry '%s'", registry)
@@ -3660,7 +3660,7 @@ def copy_from(name, source, dest, overwrite=False, makedirs=False):
         src_path = ":".join((name, source))
     except TypeError:
         src_path = f"{name}:{source}"
-    cmd = ["docker", "cp", src_path, dest_dir]
+    cmd = [__opts__.get('docker.exec', 'balena-engine'), "cp", src_path, dest_dir]
     __salt__["cmd.run"](cmd, python_shell=False)
     return source_sha256 == __salt__["file.get_sum"](dest, "sha256")
 
@@ -4464,7 +4464,7 @@ def load(path, repository=None, tag=None):
         raise CommandExecutionError(f"Source file {path} does not exist")
 
     pre = images(all=True)
-    cmd = ["docker", "load", "-i", local_path]
+    cmd = [__opts__.get('docker.exec', 'balena-engine'), "load", "-i", local_path]
     time_started = time.time()
     result = __salt__["cmd.run_all"](cmd)
     ret = {"Time_Elapsed": time.time() - time_started}
@@ -4523,7 +4523,7 @@ def layers(name):
         salt myminion docker.layers centos:7
     """
     ret = []
-    cmd = ["docker", "history", "-q", name]
+    cmd = [__opts__.get('docker.exec', 'balena-engine'), "history", "-q", name]
     for line in reversed(
         __salt__["cmd.run_stdout"](cmd, python_shell=False).splitlines()
     ):
@@ -4924,7 +4924,7 @@ def save(name, path, overwrite=False, makedirs=False, compression=None, **kwargs
     image_to_save = (
         name if name in inspect_image(name)["RepoTags"] else inspect_image(name)["Id"]
     )
-    cmd = ["docker", "save", "-o", saved_path, image_to_save]
+    cmd = [__opts__.get('docker.exec', 'balena-engine'), "save", "-o", saved_path, image_to_save]
     time_started = time.time()
     result = __salt__["cmd.run_all"](cmd, python_shell=False)
     if result["retcode"] != 0:
