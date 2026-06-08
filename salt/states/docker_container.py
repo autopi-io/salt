@@ -1849,8 +1849,8 @@ def running(
         )
 
         if not skip_comparison:
-            docker_version_info = __salt__["docker.version"]()["VersionInfo"]
-            if docker_version_info < (25, 0):
+            docker_version_info = __salt__["docker.version"]().get("VersionInfo")
+            if docker_version_info is None or docker_version_info < (25, 0):
                 compare_containers_ignore = "Hostname"
             else:
                 # With docker >= 25.0 we get a new value to compare,
