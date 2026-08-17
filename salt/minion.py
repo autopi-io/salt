@@ -1135,8 +1135,72 @@ class MinionManager(MinionBase):
         self.event.subscribe("")
         self.event.set_event_handler(self.handle_event)
 
+    # Default event-tag prefix engines publish their lifecycle state on. Can
+    # be overridden by setting `engine_event_prefix` in the minion config/opts.
+    # Engine state events use the form `<prefix>/<engine_name>/<state>`.
+    _DEFAULT_ENGINE_EVENT_PREFIX = "salt/engine"
+    # Fixed RPC tags used by engine processes to query the engine registry.
+    # Not configurable: internal protocol between MinionManager and engines.
+    _ENGINE_REGISTRY_REQ_PREFIX = "salt/engines/registry/req/"
+    _ENGINE_REGISTRY_RES_PREFIX = "salt/engines/registry/res/"
+
+    def _engine_event_prefix(self):
+        return self.opts.get(
+            "engine_event_prefix", self._DEFAULT_ENGINE_EVENT_PREFIX
+        )
+
+    def _handle_engine_lifecycle_event(self, tag, data):
+        prefix = self._engine_event_prefix() + "/"
+        if not tag.startswith(prefix):
+            return
+        remainder = tag[len(prefix):]
+        if "/" not in remainder:
+            return
+        name, state = remainder.rsplit("/", 1)
+        registry = self.__dict__.setdefault("_engine_registry", {})
+        registry[name] = {
+            "state": state,
+            "data": data if isinstance(data, dict) else {},
+            "updated_at": time.time(),
+        }
+        log.info(
+            "Engine registry updated from tag '%s': %s -> %s (registry size=%d)",
+            tag, name, state, len(registry),
+        )
+
+    async def _handle_engine_registry_request(self, tag, data):
+        correlation_id = tag[len(self._ENGINE_REGISTRY_REQ_PREFIX):]
+        res_tag = self._ENGINE_REGISTRY_RES_PREFIX + correlation_id
+        registry = self.__dict__.setdefault("_engine_registry", {})
+        names = (data or {}).get("names") if isinstance(data, dict) else None
+        if names:
+            payload = {n: registry.get(n) for n in names}
+        else:
+            payload = dict(registry)
+        log.info(
+            "Engine registry request id=%s names=%s -> reply size=%d (registry size=%d)",
+            correlation_id, names, len(payload), len(registry),
+        )
+        with salt.utils.event.get_event(
+            "minion", opts=self.opts, listen=False
+        ) as event:
+            await event.fire_event_async(payload, res_tag)
+
     async def handle_event(self, package):
         try:
+            tag, data = salt.utils.event.SaltEvent.unpack(package)
+            # Engine lifecycle / registry events are handled here at the
+            # MinionManager level because engine subprocesses are spawned from
+            # Minion.__init__ and may fire their `running` event before the
+            # minion appears in self.minions (which happens only after
+            # connect_master succeeds in _connect_minion). Handling here keeps
+            # the registry alive regardless of multi-master connection state.
+            if tag.startswith(self._ENGINE_REGISTRY_REQ_PREFIX):
+                await self._handle_engine_registry_request(tag, data)
+                return
+            if tag.startswith(self._engine_event_prefix() + "/"):
+                self._handle_engine_lifecycle_event(tag, data)
+                return
             await asyncio.gather(*[_.handle_event(package) for _ in self.minions])
         except Exception as exc:  # pylint: disable=broad-except
             log.error("Error dispatching event. %s", exc)
@@ -3499,9 +3563,10 @@ class Minion(MinionBase):
         """
         Handle an event from the epull_sock (all local minion events)
         """
+        tag, data = salt.utils.event.SaltEvent.unpack(package)
+
         if not self.ready:
             raise tornado.gen.Return()
-        tag, data = salt.utils.event.SaltEvent.unpack(package)
 
         if "proxy_target" in data and self.opts.get("metaproxy") == "deltaproxy":
             proxy_target = data["proxy_target"]
