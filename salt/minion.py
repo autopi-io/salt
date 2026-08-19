@@ -1355,13 +1355,12 @@ class MinionManager(MinionBase):
         Stop minions managed by the MinionManager allowing the io_loop to run
         and any remaining events to be processed before stopping the minions.
         """
-
-        # Sleep to allow any remaining events to be processed.
-        # This gives the minion time to send final "return" messages to the Master.
-        # Ideally, we would dynamically wait for all pending messages to be flushed
-        # from the I/O loop instead of using a static sleep amount, but for now
-        # this 5-second window handles most cases.
-        yield tornado.gen.sleep(5)
+        # Wait briefly to let pending events flush to the Master. Skip this
+        # when no minion is currently connected -- there is nowhere to flush
+        # to and the wait is pure latency during `systemctl stop/restart`
+        # on an offline device.
+        if any(getattr(m, "connected", False) for m in self.minions):
+            yield tornado.gen.sleep(5)
 
         # Continue to stop the minions
         for minion in self.minions:
@@ -1376,6 +1375,38 @@ class MinionManager(MinionBase):
         if self.event is not None:
             self.event.destroy()
             self.event = None
+
+        # Reap any leftover multiprocessing children. On a healthy shutdown
+        # the per-minion process_manager already SIGTERM'd them above, but
+        # on fresh-boot-offline `self.minions` is empty (no connected Minion
+        # was ever appended by _connect_minion), so helper subprocesses that
+        # were spawned during startup (engines, scheduler, IPC servers,
+        # etc.) are still alive. If we let sys.exit run with them alive,
+        # Python's multiprocessing atexit handler (`_exit_function`) blocks
+        # forever in `Process.join()` -> `os.waitpid`, causing
+        # `systemctl stop/restart` to hang and workers to keep logging.
+        try:
+            children = multiprocessing.active_children()
+        except Exception:  # pylint: disable=broad-except
+            children = []
+        for proc in children:
+            try:
+                proc.terminate()
+            except Exception:  # pylint: disable=broad-except
+                log.exception("Failed to terminate child pid=%s", getattr(proc, "pid", None))
+        # Yield briefly so terminated processes get a chance to exit before
+        # we escalate to SIGKILL. Non-blocking on the io_loop.
+        yield tornado.gen.sleep(0.5)
+        try:
+            children = multiprocessing.active_children()
+        except Exception:  # pylint: disable=broad-except
+            children = []
+        for proc in children:
+            try:
+                if proc.is_alive():
+                    os.kill(proc.pid, signal.SIGKILL)
+            except Exception:  # pylint: disable=broad-except
+                log.exception("Failed to SIGKILL child pid=%s", getattr(proc, "pid", None))
 
         # Call the parent signal handler
         parent_sig_handler(signum, None)
